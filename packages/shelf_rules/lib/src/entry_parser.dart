@@ -29,6 +29,37 @@ ParseOutcome<AppEntry> parseAppEntryYaml(String source) {
   return parseAppEntry(_toPlainMap(doc));
 }
 
+/// Parses a YAML document containing a list of database entries. Issues are
+/// prefixed with the entry index; entries with errors are dropped, valid
+/// ones kept.
+ParseOutcome<List<AppEntry>> parseAppEntryListYaml(String source) {
+  final Object? doc;
+  try {
+    doc = loadYaml(source);
+  } on YamlException catch (e) {
+    return ParseOutcome(
+        null, [ValidationIssue.error('(document)', 'invalid YAML: ${e.message}')]);
+  }
+  if (doc is! List) {
+    return ParseOutcome(null,
+        const [ValidationIssue.error('(document)', 'expected a list of entries')]);
+  }
+  final entries = <AppEntry>[];
+  final issues = <ValidationIssue>[];
+  for (var i = 0; i < doc.length; i++) {
+    final item = doc[i];
+    if (item is! Map) {
+      issues.add(ValidationIssue.error('[$i]', 'entry must be a map'));
+      continue;
+    }
+    final outcome = parseAppEntry(_toPlainMap(item));
+    issues.addAll(outcome.issues
+        .map((iss) => ValidationIssue(iss.severity, '[$i].${iss.field}', iss.message)));
+    if (outcome.value != null) entries.add(outcome.value!);
+  }
+  return ParseOutcome(entries, issues);
+}
+
 /// Parses a database entry from an already-decoded map (compiled db.json).
 ParseOutcome<AppEntry> parseAppEntry(Map<String, Object?> map) {
   final issues = <ValidationIssue>[];

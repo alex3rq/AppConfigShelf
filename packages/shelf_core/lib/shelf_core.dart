@@ -7,3 +7,4 @@ export 'src/failure.dart';
 export 'src/result.dart';
 export 'src/rules.dart';
 export 'src/storage_path.dart';
+export 'src/views.dart';

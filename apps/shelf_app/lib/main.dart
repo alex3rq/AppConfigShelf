@@ -1,20 +1,26 @@
-import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'features/scan/scan_page.dart';
 
 void main() {
-  runApp(const MainApp());
+  runApp(const ProviderScope(child: ShelfApp()));
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class ShelfApp extends StatelessWidget {
+  const ShelfApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
+    return FluentApp(
+      title: 'AppConfigShelf',
+      themeMode: ThemeMode.system,
+      theme: FluentThemeData(accentColor: Colors.teal),
+      darkTheme: FluentThemeData(
+        brightness: Brightness.dark,
+        accentColor: Colors.teal,
       ),
+      home: const ScanPage(),
     );
   }
 }

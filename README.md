@@ -31,4 +31,4 @@ The complete architecture and roadmap live in [`docs/plan/`](docs/plan/00-index.
 
 ## License
 
-TBD (will be OSI-approved).
+App: TBD, permissive (MIT or Apache-2.0). The community database will live in a separate repository under **CC-BY-SA-4.0**, since its seed data derives from [Winapp2](https://github.com/MoscaDotTo/Winapp2) (with attribution and modifications noted, as that license requires). See `docs/plan/04-database.md`.

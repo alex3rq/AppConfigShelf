@@ -2,6 +2,23 @@
 
 Separate repo: `appconfigshelf-db`. Inspired by Winapp2 but structured.
 
+## Data provenance & licensing
+
+Seed data will likely be derived from [Winapp2](https://github.com/MoscaDotTo/Winapp2) (`winapp2.ini`), converted and heavily modified/optimized to our schema and backup-oriented needs (Winapp2 is cleaning-oriented; we invert its intent — its "delete these" paths are often exactly our "back these up" paths, minus caches).
+
+Winapp2 is licensed **CC-BY-SA-4.0**, which obligates us to:
+
+1. **Attribution** — credit Winapp2 and its contributors.
+2. **Indicate modifications** — state that entries were converted/modified.
+3. **Share-alike** — derived entries must remain under CC-BY-SA-4.0.
+
+Consequence for repo licensing (this is a driver of the app/db split, alongside cadence and contributor-pool reasons):
+
+- `appconfigshelf-db` → **CC-BY-SA-4.0**, with an ATTRIBUTION/NOTICE file crediting Winapp2 and describing the conversion. Community contributions enter under the same license.
+- `appconfigshelf` (app) → permissive license (MIT or Apache-2.0). The app only *consumes* the compiled data bundle at runtime; it contains no Winapp2-derived content, so share-alike does not propagate to the app code.
+- Keep the boundary clean: no db-derived entry data hardcoded in the app repo (the bundled fallback db copy ships as a clearly-marked CC-BY-SA data asset, not source code).
+- Per-entry provenance field (e.g. `origin: winapp2 | original`) in the db so purely original entries are identifiable if licensing strategy ever needs it.
+
 ## Format decision
 
 **YAML source files (one per app) → compiled JSON bundle per release → app caches parsed form.**
