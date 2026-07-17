@@ -7,4 +7,7 @@ export 'src/backup_io.dart';
 export 'src/events.dart';
 export 'src/manifest.dart';
 export 'src/planner.dart';
+export 'src/reader.dart';
+export 'src/restore.dart';
+export 'src/restore_planner.dart';
 export 'src/writer.dart';

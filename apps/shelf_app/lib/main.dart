@@ -2,6 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/backup/backup_page.dart';
+import 'features/restore/restore_page.dart';
 import 'features/scan/scan_page.dart';
 
 void main() {
@@ -39,10 +40,6 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return NavigationView(
-      appBar: const NavigationAppBar(
-        title: Text('AppConfigShelf'),
-        automaticallyImplyLeading: false,
-      ),
       pane: NavigationPane(
         selected: _index,
         onChanged: (i) => setState(() => _index = i),
@@ -57,6 +54,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: const Icon(FluentIcons.save),
             title: const Text('Backup'),
             body: const BackupPage(),
+          ),
+          PaneItem(
+            icon: const Icon(FluentIcons.history),
+            title: const Text('Restore'),
+            body: const RestorePage(),
           ),
         ],
       ),
