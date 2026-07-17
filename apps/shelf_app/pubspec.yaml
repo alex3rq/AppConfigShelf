@@ -15,6 +15,7 @@ dependencies:
   flutter_riverpod: ^2.6.0
   shelf_backup: ^0.1.0
   shelf_core: ^0.1.0
+  shelf_db: ^0.1.0
   shelf_detect: ^0.1.0
   shelf_rules: ^0.1.0
   shelf_win32: ^0.1.0
@@ -27,4 +28,4 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/dev_db.yaml
+    - assets/db.json

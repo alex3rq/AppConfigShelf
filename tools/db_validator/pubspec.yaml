@@ -1,0 +1,25 @@
+name: db_validator
+description: Validates and compiles the AppConfigShelf database. The single parser (shelf_rules) guarantees the db and the app can never drift.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.12.0
+
+# Deliberately NOT a workspace member: database CI resolves this package with
+# a plain Dart SDK (no Flutter), so it must stand alone with path deps.
+dependencies:
+  cryptography: ^2.7.0
+  crypto: ^3.0.0
+  shelf_core:
+    path: ../../packages/shelf_core
+  shelf_rules:
+    path: ../../packages/shelf_rules
+
+# shelf_rules declares hosted version constraints for its siblings (correct
+# inside the workspace); standalone resolution needs them pinned to paths.
+dependency_overrides:
+  shelf_core:
+    path: ../../packages/shelf_core
+
+dev_dependencies:
+  lints: ^6.0.0

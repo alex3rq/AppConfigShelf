@@ -1,17 +1,9 @@
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_backup/shelf_backup.dart';
 import 'package:shelf_core/shelf_core.dart';
-import 'package:shelf_rules/shelf_rules.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
 import 'custom_items_store.dart';
-
-/// The database entries available for backup (dev db until M4).
-final dbEntriesProvider = FutureProvider<List<AppEntry>>((ref) async {
-  final yaml = await rootBundle.loadString('assets/dev_db.yaml');
-  return parseAppEntryListYaml(yaml).value ?? const [];
-});
 
 final customItemsProvider =
     NotifierProvider<CustomItemsNotifier, List<CustomItem>>(

@@ -2,6 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/backup/backup_page.dart';
+import 'features/database/database_page.dart';
 import 'features/restore/restore_page.dart';
 import 'features/scan/scan_page.dart';
 
@@ -59,6 +60,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: const Icon(FluentIcons.history),
             title: const Text('Restore'),
             body: const RestorePage(),
+          ),
+          PaneItem(
+            icon: const Icon(FluentIcons.database),
+            title: const Text('Database'),
+            body: const DatabasePage(),
           ),
         ],
       ),

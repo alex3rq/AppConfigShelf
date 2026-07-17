@@ -5,7 +5,6 @@
 import 'dart:io';
 
 import 'package:shelf_backup/shelf_backup.dart';
-import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
 Future<void> main(List<String> args) async {

@@ -3,6 +3,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart';
 
+import '../database/db_providers.dart';
 import '../scan/scan_view_model.dart';
 import 'backup_view_model.dart';
 

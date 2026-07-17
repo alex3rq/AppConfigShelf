@@ -14,6 +14,10 @@ enum EntrySource {
 /// browser profile is not treated like a terminal color scheme.
 enum RiskTier { safe, caution, expert }
 
+/// Provenance of a database entry, for CC-BY-SA attribution (db repo
+/// NOTICE.md). Not used by any engine logic.
+enum EntryOrigin { original, winapp2 }
+
 /// A community-database application entry (db schema v1).
 /// Parsing/validation lives in shelf_rules; this is the parsed form.
 final class AppEntry {
@@ -26,6 +30,7 @@ final class AppEntry {
     required this.backup,
     this.wingetId,
     this.risk = RiskTier.safe,
+    this.origin = EntryOrigin.original,
   });
 
   /// Stable lowercase identifier, unique across the database (e.g. `vscode`).
@@ -47,6 +52,8 @@ final class AppEntry {
   final String? wingetId;
 
   final RiskTier risk;
+
+  final EntryOrigin origin;
 }
 
 /// A user-defined backup item: any folders/files the user chose that no

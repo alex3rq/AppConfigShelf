@@ -1,10 +1,10 @@
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_backup/shelf_backup.dart';
 import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_detect/shelf_detect.dart';
-import 'package:shelf_rules/shelf_rules.dart';
 import 'package:shelf_win32/shelf_win32.dart';
+
+import '../database/db_providers.dart';
 
 sealed class RestoreUiState {
   const RestoreUiState();
@@ -55,8 +55,7 @@ class RestoreNotifier extends Notifier<RestoreUiState> {
     }
 
     // Detection gating: scan with the current database.
-    final yaml = await rootBundle.loadString('assets/dev_db.yaml');
-    final entries = parseAppEntryListYaml(yaml).value ?? const [];
+    final entries = await ref.read(dbEntriesProvider.future);
     final folders = WindowsKnownFolderResolver();
     final scan = scanSystem(
       entries: entries,

@@ -76,12 +76,13 @@ ParseOutcome<AppEntry> parseAppEntry(Map<String, Object?> map) {
   final aliases = _stringList(map, 'aliases', issues);
 
   final risk = _parseRisk(map, issues);
+  final origin = _parseOrigin(map, issues);
   final detect = _parseDetect(map, issues);
   final backup = _parseBackup(map, issues);
 
   final knownKeys = {
     'id', 'name', 'publisher', 'aliases', 'detect', 'backup',
-    'registry', 'winget', 'risk',
+    'registry', 'winget', 'risk', 'origin',
   };
   for (final key in map.keys) {
     if (!knownKeys.contains(key)) {
@@ -102,6 +103,7 @@ ParseOutcome<AppEntry> parseAppEntry(Map<String, Object?> map) {
       backup: backup,
       wingetId: wingetId,
       risk: risk,
+      origin: origin,
     ),
     issues,
   );
@@ -133,6 +135,29 @@ ParseOutcome<CustomItem> parseCustomItem(Map<String, Object?> map) {
       CustomItem(slug: slug!, name: name!, backup: backup), issues);
 }
 
+/// Serializes a database entry to the map form [parseAppEntry] accepts —
+/// used by the db compiler to produce the release bundle.
+Map<String, Object?> appEntryToJson(AppEntry entry) => {
+      'id': entry.id,
+      'name': entry.name,
+      if (entry.publisher != null) 'publisher': entry.publisher,
+      if (entry.aliases.isNotEmpty) 'aliases': entry.aliases,
+      'detect': [
+        for (final rule in entry.detect)
+          switch (rule) {
+            RegistryDetection(:final keyPath) => {'registry': keyPath},
+            PathDetection(:final path) => {'path': path.stored},
+            MsixDetection(:final packageFamilyName) => {
+                'msix': packageFamilyName
+              },
+          },
+      ],
+      'backup': [for (final rule in entry.backup) backupRuleToJson(rule)],
+      if (entry.wingetId != null) 'winget': entry.wingetId,
+      if (entry.risk != RiskTier.safe) 'risk': entry.risk.name,
+      if (entry.origin != EntryOrigin.original) 'origin': entry.origin.name,
+    };
+
 /// Serializes a custom item to the map form [parseCustomItem] accepts —
 /// used for local persistence and the package manifest.
 Map<String, Object?> customItemToJson(CustomItem item) => {
@@ -148,6 +173,20 @@ Map<String, Object?> backupRuleToJson(BackupRule rule) => {
       if (rule.optional) 'optional': true,
       if (rule.sizeWarning) 'sizeWarning': true,
     };
+
+EntryOrigin _parseOrigin(
+    Map<String, Object?> map, List<ValidationIssue> issues) {
+  final raw = map['origin'];
+  if (raw == null) return EntryOrigin.original;
+  if (raw is String) {
+    for (final origin in EntryOrigin.values) {
+      if (origin.name == raw) return origin;
+    }
+  }
+  issues.add(ValidationIssue.error('origin',
+      "must be one of ${EntryOrigin.values.map((o) => o.name).join('|')}"));
+  return EntryOrigin.original;
+}
 
 RiskTier _parseRisk(Map<String, Object?> map, List<ValidationIssue> issues) {
   final raw = map['risk'];
