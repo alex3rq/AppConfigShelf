@@ -7,4 +7,5 @@
 library;
 
 export 'src/entry_parser.dart';
+export 'src/rule_eval.dart';
 export 'src/validation.dart';

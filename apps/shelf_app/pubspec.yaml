@@ -8,10 +8,12 @@ environment:
   sdk: ^3.12.0
 
 dependencies:
+  file_selector: ^1.0.0
   fluent_ui: ^4.9.0
   flutter:
     sdk: flutter
   flutter_riverpod: ^2.6.0
+  shelf_backup: ^0.1.0
   shelf_core: ^0.1.0
   shelf_detect: ^0.1.0
   shelf_rules: ^0.1.0

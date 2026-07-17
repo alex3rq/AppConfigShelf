@@ -133,6 +133,22 @@ ParseOutcome<CustomItem> parseCustomItem(Map<String, Object?> map) {
       CustomItem(slug: slug!, name: name!, backup: backup), issues);
 }
 
+/// Serializes a custom item to the map form [parseCustomItem] accepts —
+/// used for local persistence and the package manifest.
+Map<String, Object?> customItemToJson(CustomItem item) => {
+      'slug': item.slug,
+      'name': item.name,
+      'backup': [for (final rule in item.backup) backupRuleToJson(rule)],
+    };
+
+Map<String, Object?> backupRuleToJson(BackupRule rule) => {
+      'path': rule.path.stored,
+      if (rule.include.isNotEmpty) 'include': rule.include,
+      if (rule.exclude.isNotEmpty) 'exclude': rule.exclude,
+      if (rule.optional) 'optional': true,
+      if (rule.sizeWarning) 'sizeWarning': true,
+    };
+
 RiskTier _parseRisk(Map<String, Object?> map, List<ValidationIssue> issues) {
   final raw = map['risk'];
   if (raw == null) return RiskTier.safe;
