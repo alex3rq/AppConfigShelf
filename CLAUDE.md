@@ -20,6 +20,12 @@ All architecture decisions live in `docs/plan/`. Start at `docs/plan/00-index.md
 
 Follow `docs/plan/12-roadmap.md` (milestones M0–M5). Engines before UI; format specs before engines.
 
+## Local dev notes
+
+- Pub workspace (Dart 3.12+) + melos 7; config lives in the root `pubspec.yaml` (no melos.yaml). Resolve with `flutter pub get` at the root.
+- Plain `dart` commands (`dart test`, `dart run melos ...`) need `FLUTTER_ROOT` set (e.g. `C:/Dev/FlutterSDK/flutter`) because the workspace includes a Flutter package.
+- Run package tests from the package directory: `cd packages/shelf_core && dart test`.
+
 ## Conventions
 
 - Windows-specific I/O only inside `shelf_win32` behind interfaces; everything else must run (and be tested) on Linux CI.

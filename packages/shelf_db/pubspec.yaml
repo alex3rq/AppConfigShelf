@@ -1,0 +1,15 @@
+name: shelf_db
+description: Database bundle loading, verification, and updating for AppConfigShelf.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  shelf_core: ^0.1.0
+  shelf_rules: ^0.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0

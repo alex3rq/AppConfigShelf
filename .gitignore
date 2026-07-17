@@ -1,9 +1,14 @@
-# Dart / Flutter (expanded when scaffold lands)
+# Dart / Flutter
 .dart_tool/
 build/
-.packages
-pubspec.lock.bak
+.flutter-plugins
+.flutter-plugins-dependencies
 *.iml
+
+# Keep the root workspace lockfile; package-level locks are not used
+# with pub workspaces.
+packages/**/pubspec.lock
+apps/**/pubspec.lock
 
 # IDE
 .idea/

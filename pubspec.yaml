@@ -1,0 +1,37 @@
+name: appconfigshelf_workspace
+publish_to: none
+environment:
+  sdk: ^3.12.0
+
+workspace:
+  - apps/shelf_app
+  - packages/shelf_core
+  - packages/shelf_rules
+  - packages/shelf_detect
+  - packages/shelf_backup
+  - packages/shelf_db
+  - packages/shelf_win32
+
+dev_dependencies:
+  melos: ^7.0.0
+
+melos:
+  scripts:
+    analyze:
+      description: Run static analysis in every package.
+      run: dart analyze .
+    test:
+      description: Run tests in every package that has them.
+      exec: dart test
+      packageFilters:
+        dirExists: test
+        flutter: false
+    test:flutter:
+      description: Run Flutter tests in Flutter packages.
+      exec: flutter test
+      packageFilters:
+        dirExists: test
+        flutter: true
+    format:
+      description: Verify formatting.
+      run: dart format --output=none --set-exit-if-changed .
