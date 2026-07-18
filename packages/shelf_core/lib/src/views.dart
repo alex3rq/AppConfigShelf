@@ -22,6 +22,10 @@ abstract interface class RegistryView {
 /// absolute Windows paths.
 abstract interface class FileSystemView {
   bool exists(String absolutePath);
+
+  /// Names (not paths) of the immediate subdirectories of [absolutePath].
+  /// Empty when the directory does not exist or cannot be listed.
+  List<String> subdirectoryNames(String absolutePath);
 }
 
 /// Resolves [KnownFolder] tokens to absolute paths for the current user.

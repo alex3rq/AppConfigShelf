@@ -38,14 +38,28 @@ final class FakeRegistry implements RegistryView {
 }
 
 final class FakeFileSystem implements FileSystemView {
-  FakeFileSystem(Iterable<String> existing)
-      : _existing = existing.map((p) => p.toUpperCase()).toSet();
+  FakeFileSystem(Iterable<String> existing) : _existing = existing.toList();
 
-  final Set<String> _existing;
+  /// Original-case paths, matched case-insensitively like NTFS.
+  final List<String> _existing;
 
   @override
-  bool exists(String absolutePath) =>
-      _existing.contains(absolutePath.toUpperCase());
+  bool exists(String absolutePath) {
+    final wanted = absolutePath.toUpperCase();
+    return _existing.any((p) => p.toUpperCase() == wanted);
+  }
+
+  @override
+  List<String> subdirectoryNames(String absolutePath) {
+    final prefix = '${absolutePath.toUpperCase()}\\';
+    final names = <String>{};
+    for (final path in _existing) {
+      if (path.toUpperCase().startsWith(prefix)) {
+        names.add(path.substring(prefix.length).split(r'\').first);
+      }
+    }
+    return names.toList();
+  }
 }
 
 final class FakeKnownFolders implements KnownFolderResolver {

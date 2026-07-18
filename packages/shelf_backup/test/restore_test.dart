@@ -264,4 +264,7 @@ final class _NoKnownFolders implements KnownFolderResolver {
 final class _NothingExists implements FileSystemView {
   @override
   bool exists(String absolutePath) => false;
+
+  @override
+  List<String> subdirectoryNames(String absolutePath) => const [];
 }

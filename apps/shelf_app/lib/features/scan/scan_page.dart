@@ -2,6 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_detect/shelf_detect.dart';
 
+import 'config_finder_dialog.dart';
 import 'scan_view_model.dart';
 
 class ScanPage extends ConsumerWidget {
@@ -38,13 +39,13 @@ class ScanPage extends ConsumerWidget {
   }
 }
 
-class _ResultList extends StatelessWidget {
+class _ResultList extends ConsumerWidget {
   const _ResultList({required this.result});
 
   final ResolutionResult result;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = FluentTheme.of(context);
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -71,6 +72,10 @@ class _ResultList extends StatelessWidget {
               if (evidence.publisher != null) evidence.publisher!,
               if (evidence.version != null) 'v${evidence.version}',
             ].join('  ·  ')),
+            trailing: Button(
+              onPressed: () => showConfigFinderDialog(context, ref, evidence),
+              child: const Text('Find config…'),
+            ),
           ),
       ],
     );

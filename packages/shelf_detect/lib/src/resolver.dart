@@ -1,5 +1,6 @@
 import 'package:shelf_core/shelf_core.dart';
 
+import 'config_locator.dart' show normalizeAppName;
 import 'evidence.dart';
 
 /// Result of resolving all evidence against the database.
@@ -103,13 +104,5 @@ final class EvidenceResolver {
       .replaceFirst('HKEY_CURRENT_USER', 'HKCU')
       .replaceFirst('HKEY_LOCAL_MACHINE', 'HKLM');
 
-  /// Lowercase, strip non-alphanumerics and trailing version numbers so
-  /// "Notepad++ (64-bit x64)" and "notepad++" meet in the middle.
-  static String _normalizeName(String name) {
-    var n = name.toLowerCase();
-    n = n.replaceAll(RegExp(r'\((?:[^)]*)\)'), ''); // parenthesized suffixes
-    n = n.replaceAll(RegExp(r'[^a-z0-9]+'), '');
-    n = n.replaceAll(RegExp(r'(?:v?\d+(?:\.\d+)*)$'), ''); // trailing version
-    return n;
-  }
+  static String _normalizeName(String name) => normalizeAppName(name);
 }
