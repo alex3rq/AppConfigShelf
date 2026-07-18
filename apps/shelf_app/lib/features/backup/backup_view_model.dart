@@ -9,6 +9,10 @@ import '../../shared/format.dart';
 import '../home/history_store.dart';
 import 'custom_items_store.dart';
 
+/// App entry ids ticked for the next backup. Lives outside the page so
+/// "Add to backup" on the Applications tab can pre-select apps.
+final backupSelectionProvider = StateProvider<Set<String>>((ref) => {});
+
 final customItemsProvider =
     NotifierProvider<CustomItemsNotifier, List<CustomItem>>(
         CustomItemsNotifier.new);

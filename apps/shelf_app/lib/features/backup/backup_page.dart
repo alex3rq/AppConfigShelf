@@ -15,6 +15,7 @@ import '../../shell_index.dart';
 import '../../theme/shelf_theme.dart';
 import '../database/db_providers.dart';
 import '../scan/scan_view_model.dart';
+import 'add_custom_item.dart';
 import 'backup_view_model.dart';
 
 class BackupPage extends ConsumerStatefulWidget {
@@ -25,12 +26,20 @@ class BackupPage extends ConsumerStatefulWidget {
 }
 
 class _BackupPageState extends ConsumerState<BackupPage> {
-  final _selectedApps = <String>{};
   String _filter = '';
   String? _outputPath;
 
+  Set<String> get _selectedApps => ref.read(backupSelectionProvider);
+
+  void _updateSelection(void Function(Set<String>) mutate) {
+    final next = {...ref.read(backupSelectionProvider)};
+    mutate(next);
+    ref.read(backupSelectionProvider.notifier).state = next;
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.watch(backupSelectionProvider);
     final scan = ref.watch(scanProvider).valueOrNull;
     final dbEntries = ref.watch(dbEntriesProvider).valueOrNull ?? const [];
     final customItems = ref.watch(customItemsProvider);
@@ -114,12 +123,11 @@ class _BackupPageState extends ConsumerState<BackupPage> {
               checked: allSelected,
               onChanged: detectedEntries.isEmpty
                   ? null
-                  : (v) => setState(() {
+                  : (v) => _updateSelection((s) {
                         if (v ?? false) {
-                          _selectedApps
-                              .addAll([for (final e in detectedEntries) e.id]);
+                          s.addAll([for (final e in detectedEntries) e.id]);
                         } else {
-                          _selectedApps.clear();
+                          s.clear();
                         }
                       }),
               content: Text(
@@ -153,11 +161,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   _SelectRow(
                     first: i == 0,
                     checked: _selectedApps.contains(entry.id),
-                    onChanged: (v) => setState(() {
-                      v
-                          ? _selectedApps.add(entry.id)
-                          : _selectedApps.remove(entry.id);
-                    }),
+                    onChanged: (v) => _updateSelection(
+                        (s) => v ? s.add(entry.id) : s.remove(entry.id)),
                     name: entry.name,
                     detail: entry.id,
                     trailing: RiskChip(risk: entry.risk),
@@ -173,7 +178,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                   style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
             ),
             Button(
-              onPressed: _addCustomItem,
+              onPressed: () => addCustomItemFlow(context, ref),
               child: const Text('Add folder…'),
             ),
           ],
@@ -211,72 +216,6 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           ),
       ],
     );
-  }
-
-  Future<void> _addCustomItem() async {
-    final dir = await fs.getDirectoryPath();
-    if (dir == null || !mounted) return;
-
-    final parsed = StoragePath.parse(dir, allowAbsolute: true);
-    final path = parsed.valueOrNull;
-    if (path == null) {
-      await displayInfoBar(context, builder: (context, close) {
-        return InfoBar(
-          title: const Text('Unsupported path'),
-          content: Text(parsed.failureOrNull!.message),
-          severity: InfoBarSeverity.error,
-          onClose: close,
-        );
-      });
-      return;
-    }
-
-    final defaultName = dir.split(RegExp(r'[\\/]')).last;
-    final name = await _promptName(defaultName);
-    if (name == null || name.isEmpty) return;
-
-    final slug = _slugify(name);
-    ref.read(customItemsProvider.notifier).add(CustomItem(
-          slug: slug,
-          name: name,
-          backup: [BackupRule(path: path)],
-        ));
-  }
-
-  Future<String?> _promptName(String initial) {
-    final controller = TextEditingController(text: initial);
-    return showDialog<String>(
-      context: context,
-      builder: (context) => ContentDialog(
-        title: const Text('Name this item'),
-        content: TextBox(controller: controller, autofocus: true),
-        actions: [
-          Button(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _slugify(String name) {
-    final existing = {for (final i in ref.read(customItemsProvider)) i.slug};
-    var base = name
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    if (base.isEmpty) base = 'item';
-    var slug = base;
-    var n = 2;
-    while (existing.contains(slug)) {
-      slug = '$base-${n++}';
-    }
-    return slug;
   }
 
   Future<void> _startBackup(

@@ -1,5 +1,4 @@
 import 'package:fluent_ui/fluent_ui.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_detect/shelf_detect.dart';
@@ -7,11 +6,11 @@ import 'package:shelf_win32/shelf_win32.dart';
 
 import '../../shared/widgets/risk_chip.dart';
 import '../../theme/shelf_theme.dart';
+import '../backup/add_custom_item.dart';
 import '../database/db_providers.dart';
-import '../database/entry_draft.dart';
 import '../database/entry_editor_dialog.dart';
 
-enum _FinderOutcome { savedToLibrary, copiedDraft }
+enum _FinderOutcome { savedToLibrary, addedCustomItem }
 
 /// Shows heuristic config-folder candidates for an app the database doesn't
 /// know. Primary flow: save the app to "My library" as a real database
@@ -44,11 +43,11 @@ Future<void> showConfigFinderDialog(
           severity: InfoBarSeverity.success,
           onClose: close,
         ),
-      _FinderOutcome.copiedDraft => const InfoBar(
-          title: Text('Draft copied'),
+      _FinderOutcome.addedCustomItem => const InfoBar(
+          title: Text('Custom item added'),
           content: Text(
-              'Paste it into a new file under apps/ in the AppConfigShelf-DB '
-              'repository and open a pull request.'),
+              'The folder is listed under Custom items on the Backup tab '
+              'and will be included in every backup.'),
           severity: InfoBarSeverity.success,
         ),
     };
@@ -81,11 +80,23 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
       constraints: const BoxConstraints(maxWidth: 560),
       title: Text('Find configuration — $_appName'),
       content: widget.candidates.isEmpty
-          ? const Text(
-              'No likely config folders found under AppData, LocalAppData, or '
-              'Documents. The app may store settings in the registry or its '
-              'install folder — you can still add any folder manually as a '
-              'custom item on the Backup tab.')
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                    'No likely config folders found under AppData, '
+                    'LocalAppData, or Documents. The app may store settings '
+                    'in the registry or its install folder — you can still '
+                    'pick any folder yourself and back it up as a custom '
+                    'item.'),
+                const SizedBox(height: ShelfSpacing.md),
+                Button(
+                  onPressed: _addCustomItem,
+                  child: const Text('Add folder as custom item…'),
+                ),
+              ],
+            )
           : Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,11 +118,21 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
                     }),
                   ),
                 const SizedBox(height: ShelfSpacing.sm),
-                Text(
-                    'Nothing here? Settings may live in the registry or the '
-                    'install folder — add them as a custom item from Backup.',
-                    style:
-                        ShelfType.caption.copyWith(color: p.textSecondary)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                          'Nothing here? Settings may live in the registry '
+                          'or the install folder.',
+                          style: ShelfType.caption
+                              .copyWith(color: p.textSecondary)),
+                    ),
+                    HyperlinkButton(
+                      onPressed: _addCustomItem,
+                      child: const Text('Add folder as custom item…'),
+                    ),
+                  ],
+                ),
               ],
             ),
       actions: [
@@ -120,10 +141,6 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
           child: const Text('Close'),
         ),
         if (widget.candidates.isNotEmpty) ...[
-          Button(
-            onPressed: _selected.isEmpty ? null : _copyDraft,
-            child: const Text('Copy db-entry draft (YAML)'),
-          ),
           Button(
             onPressed: _selected.isEmpty ? null : _editBeforeSaving,
             child: const Text('Edit before saving…'),
@@ -173,10 +190,10 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
     Navigator.pop(context, _FinderOutcome.savedToLibrary);
   }
 
-  Future<void> _copyDraft() async {
-    await Clipboard.setData(ClipboardData(text: buildYamlDraft(_buildEntry())));
-    if (!mounted) return;
-    Navigator.pop(context, _FinderOutcome.copiedDraft);
+  Future<void> _addCustomItem() async {
+    final added = await addCustomItemFlow(context, ref);
+    if (!added || !mounted) return;
+    Navigator.pop(context, _FinderOutcome.addedCustomItem);
   }
 }
 

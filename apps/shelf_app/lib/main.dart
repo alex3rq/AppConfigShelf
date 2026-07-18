@@ -54,23 +54,11 @@ class HomeShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(shellIndexProvider);
-    return Stack(children: [
-      _buildNavigationView(context, ref, index),
-      // NavigationPane has no slot for a free-form footer widget
-      // (PaneItemHeader does not render in footerItems), so the db-status
-      // card overlays the pane bottom, above the Theme action item.
-      const Positioned(
-          left: 4, bottom: 40, width: 212, child: _PaneStatusFooter()),
-    ]);
-  }
-
-  Widget _buildNavigationView(
-      BuildContext context, WidgetRef ref, int index) {
     return NavigationView(
       pane: NavigationPane(
         selected: index,
         onChanged: (i) => ref.read(shellIndexProvider.notifier).state = i,
-        displayMode: PaneDisplayMode.expanded,
+        displayMode: PaneDisplayMode.auto,
         size: const NavigationPaneSize(openWidth: 220),
         header: const _PaneHeader(),
         items: [
@@ -102,6 +90,12 @@ class HomeShell extends ConsumerWidget {
         ],
         footerItems: [
           PaneItemAction(
+            icon: const Icon(FluentIcons.info),
+            title: const _PaneStatusFooter(),
+            onTap: () => ref.read(shellIndexProvider.notifier).state =
+                ShellTab.library,
+          ),
+          PaneItemAction(
             icon: const Icon(FluentIcons.color),
             title: const Text('Theme'),
             onTap: () => _showThemePicker(context, ref),
@@ -122,9 +116,9 @@ class HomeShell extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (final (mode, label) in [
-              (ThemeMode.dark, 'Dark (default)'),
+              (ThemeMode.system, 'Follow Windows setting (default)'),
+              (ThemeMode.dark, 'Dark'),
               (ThemeMode.light, 'Light'),
-              (ThemeMode.system, 'Follow Windows setting'),
             ])
               ListTile.selectable(
                 selected: current == mode,
@@ -185,6 +179,8 @@ class _PaneHeader extends StatelessWidget {
   }
 }
 
+/// Compact db-version / last-backup status line rendered as the title of a
+/// pane footer item, so it works in both expanded and compact pane modes.
 class _PaneStatusFooter extends ConsumerWidget {
   const _PaneStatusFooter();
 
@@ -201,33 +197,30 @@ class _PaneStatusFooter extends ConsumerWidget {
       final days = DateTime.now().difference(t).inDays;
       if (days < 1) return 'today';
       if (days == 1) return 'yesterday';
-      return '$days days ago';
+      return '${days}d ago';
     }
 
-    return Container(
-      margin: const EdgeInsets.all(ShelfSpacing.sm),
-      padding: const EdgeInsets.all(ShelfSpacing.sm),
-      decoration: BoxDecoration(
-        color: p.card,
-        borderRadius: BorderRadius.circular(ShelfSpacing.controlRadius),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            bundle == null
-                ? 'Database loading…'
-                : 'Database v${bundle.contentVersion} · ${bundle.entries.length} entries',
-            style: ShelfType.caption.copyWith(color: p.textSecondary),
-          ),
-          Text(
-            lastBackup == null
-                ? 'No backups yet'
-                : 'Last backup · ${relative(lastBackup.timestamp)}',
-            style: ShelfType.caption.copyWith(color: p.textSecondary),
-          ),
-        ],
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          bundle == null
+              ? 'Database loading…'
+              : 'Db v${bundle.contentVersion} · ${bundle.entries.length} entries',
+          style: ShelfType.caption
+              .copyWith(color: p.textSecondary, height: 1.1),
+          overflow: TextOverflow.ellipsis,
+        ),
+        Text(
+          lastBackup == null
+              ? 'No backups yet'
+              : 'Last backup ${relative(lastBackup.timestamp)}',
+          style: ShelfType.caption
+              .copyWith(color: p.textSecondary, height: 1.1),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 }

@@ -7,7 +7,8 @@ import 'package:shelf_core/shelf_core.dart' show KnownFolder;
 import 'package:shelf_win32/shelf_win32.dart';
 
 /// Persists app settings (currently just theme mode) to
-/// `%APPDATA%\AppConfigShelf\settings.json`. Defaults to dark.
+/// `%APPDATA%\AppConfigShelf\settings.json`. Defaults to following the
+/// Windows setting.
 final class SettingsStore {
   SettingsStore({String? overridePath})
       : _path = overridePath ??
@@ -18,17 +19,17 @@ final class SettingsStore {
 
   ThemeMode loadThemeMode() {
     final file = File(_path);
-    if (!file.existsSync()) return ThemeMode.dark;
+    if (!file.existsSync()) return ThemeMode.system;
     try {
       final decoded = jsonDecode(file.readAsStringSync());
-      if (decoded is! Map) return ThemeMode.dark;
+      if (decoded is! Map) return ThemeMode.system;
       return switch (decoded['themeMode']) {
         'light' => ThemeMode.light,
-        'system' => ThemeMode.system,
-        _ => ThemeMode.dark,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
       };
     } on FormatException {
-      return ThemeMode.dark;
+      return ThemeMode.system;
     }
   }
 

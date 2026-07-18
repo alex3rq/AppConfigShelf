@@ -1,5 +1,7 @@
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart' as fs;
 import 'package:fluent_ui/fluent_ui.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_db/shelf_db.dart';
@@ -363,12 +365,12 @@ class _EntryDetail extends ConsumerWidget {
                 ],
               ),
             ),
-            Button(
-              onPressed: () => _copyDraft(context, entry),
-              child: const Text('Copy YAML draft'),
-            ),
-            const SizedBox(width: ShelfSpacing.sm),
-            if (isMine)
+            if (isMine) ...[
+              Button(
+                onPressed: () => _exportYaml(context, entry),
+                child: const Text('Export YAML…'),
+              ),
+              const SizedBox(width: ShelfSpacing.sm),
               Button(
                 onPressed: () =>
                     ref.read(localEntriesProvider.notifier).delete(entry.id),
@@ -376,6 +378,7 @@ class _EntryDetail extends ConsumerWidget {
                     ? 'Reset to official'
                     : 'Delete entry'),
               ),
+            ],
             const SizedBox(width: ShelfSpacing.sm),
             FilledButton(
               onPressed: () => _edit(context, ref, entry),
@@ -480,15 +483,21 @@ class _EntryDetail extends ConsumerWidget {
     ref.read(localEntriesProvider.notifier).save(edited);
   }
 
-  Future<void> _copyDraft(BuildContext context, AppEntry entry) async {
-    await Clipboard.setData(ClipboardData(text: buildYamlDraft(entry)));
-    if (!context.mounted) return;
+  Future<void> _exportYaml(BuildContext context, AppEntry entry) async {
+    final location = await fs.getSaveLocation(
+      suggestedName: '${entry.id}.yaml',
+      acceptedTypeGroups: const [
+        fs.XTypeGroup(label: 'YAML', extensions: ['yaml', 'yml']),
+      ],
+    );
+    if (location == null || !context.mounted) return;
+    File(location.path).writeAsStringSync(buildYamlDraft(entry));
     await displayInfoBar(context, builder: (context, close) {
       return InfoBar(
-        title: const Text('YAML draft copied'),
-        content: const Text(
-            'Paste into a new file under apps/ in AppConfigShelf-DB and open '
-            'a pull request.'),
+        title: const Text('YAML exported'),
+        content: Text(
+            'Saved to ${location.path}. Add it under apps/ in the '
+            'AppConfigShelf-DB repository and open a pull request.'),
         severity: InfoBarSeverity.success,
         onClose: close,
       );

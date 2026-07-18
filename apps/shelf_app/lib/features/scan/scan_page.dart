@@ -8,6 +8,7 @@ import '../../shared/widgets/risk_chip.dart';
 import '../../shared/widgets/shelf_card.dart';
 import '../../shell_index.dart';
 import '../../theme/shelf_theme.dart';
+import '../backup/backup_view_model.dart';
 import '../database/db_providers.dart';
 import 'config_finder_dialog.dart';
 import 'ignored_store.dart';
@@ -131,8 +132,14 @@ class _ResultList extends ConsumerWidget {
                   style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
             ),
             HyperlinkButton(
-              onPressed: () => ref.read(shellIndexProvider.notifier).state =
-                  ShellTab.backup,
+              onPressed: () {
+                ref.read(backupSelectionProvider.notifier).state = {
+                  ...ref.read(backupSelectionProvider),
+                  for (final d in result.detected)
+                    if (d.entryId != null) d.entryId!,
+                };
+                ref.read(shellIndexProvider.notifier).state = ShellTab.backup;
+              },
               child: const Text('Add all to backup'),
             ),
           ],
@@ -160,9 +167,18 @@ class _ResultList extends ConsumerWidget {
                               .copyWith(color: p.textSecondary)),
                       const SizedBox(width: ShelfSpacing.md),
                       HyperlinkButton(
-                        onPressed: () => ref
-                            .read(shellIndexProvider.notifier)
-                            .state = ShellTab.backup,
+                        onPressed: app.entryId == null
+                            ? null
+                            : () {
+                                ref
+                                    .read(backupSelectionProvider.notifier)
+                                    .state = {
+                                  ...ref.read(backupSelectionProvider),
+                                  app.entryId!,
+                                };
+                                ref.read(shellIndexProvider.notifier).state =
+                                    ShellTab.backup;
+                              },
                         child: const Text('Add to backup'),
                       ),
                     ],
