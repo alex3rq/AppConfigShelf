@@ -14,7 +14,7 @@ final class LocalEntryStore {
 
   final String directory;
 
-  String _pathFor(String id) => '$directory\\$id.json';
+  String _pathFor(String id) => '$directory/$id.json';
 
   /// Loads all valid entries. Unparseable files are skipped and reported in
   /// [LocalEntries.warnings] rather than breaking the whole library.

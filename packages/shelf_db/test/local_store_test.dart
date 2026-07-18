@@ -51,8 +51,8 @@ void main() {
 
   test('invalid file is skipped with warning, valid ones survive', () {
     store.save(_entry('good'));
-    File('${temp.path}\\bad.json').writeAsStringSync('{not json');
-    File('${temp.path}\\invalid-entry.json')
+    File('${temp.path}/bad.json').writeAsStringSync('{not json');
+    File('${temp.path}/invalid-entry.json')
         .writeAsStringSync('{"id": "x y z"}');
     final loaded = store.load();
     expect(loaded.entries.single.id, 'good');
@@ -60,7 +60,7 @@ void main() {
   });
 
   test('missing directory loads empty', () {
-    final missing = LocalEntryStore('${temp.path}\\nope');
+    final missing = LocalEntryStore('${temp.path}/nope');
     expect(missing.load().entries, isEmpty);
   });
 
