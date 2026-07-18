@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Tests
+        run: |
+          cd packages/shelf_backup; dart test; cd ../..
+          cd packages/shelf_core; dart test; cd ../..
+          cd packages/shelf_rules; dart test; cd ../..
+          cd packages/shelf_detect; dart test; cd ../..
+          cd packages/shelf_db; dart test; cd ../..
+
+      - name: Build
+        run: cd apps/shelf_app; flutter build windows --release
+
+      # Portable zip distribution. MSIX intentionally omitted until a real
+      # code-signing certificate exists — a test-cert MSIX is uninstallable
+      # for normal users, a plain zip is not.
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}".TrimStart("v")
+          $stage = "AppConfigShelf-$version-portable"
+          New-Item -ItemType Directory $stage | Out-Null
+          Copy-Item -Recurse apps/shelf_app/build/windows/x64/runner/Release/* $stage/
+          Copy-Item README.md $stage/
+          Set-Content "$stage/PORTABLE.txt" @"
+          AppConfigShelf $version (portable)
+
+          Run shelf_app.exe. No installation required.
+          Settings, logs, and your library live under
+          %APPDATA%\AppConfigShelf and %LOCALAPPDATA%\AppConfigShelf.
+
+          This build is not code-signed yet; SmartScreen may warn on first
+          run (More info -> Run anyway). Verify your download came from
+          https://github.com/alex3rq/AppConfigShelf/releases
+          "@
+          Compress-Archive -Path $stage -DestinationPath "$stage.zip"
+          Get-FileHash "$stage.zip" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $stage.zip" } |
+            Set-Content "$stage.zip.sha256"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            AppConfigShelf-*-portable.zip
+            AppConfigShelf-*-portable.zip.sha256
