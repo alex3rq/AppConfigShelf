@@ -20,6 +20,15 @@ All architecture decisions live in `docs/plan/`. Start at `docs/plan/00-index.md
 
 Follow `docs/plan/12-roadmap.md` (milestones M0–M5). Engines before UI; format specs before engines.
 
+## Progress (2026-07-17)
+
+M0–M4 complete plus most of M5: engines implemented and tested (round-trip
+gate green), app has Scan/Backup/Restore/Database tabs, db repo live with 66
+entries and signed release v2026.07.1 (verified end-to-end), CI on both
+repos, MSIX packaging configured (test cert). Remaining for v1.0: winget
+submission, real code-signing, broader entry coverage, release automation
+for the app itself.
+
 ## Local dev notes
 
 - Pub workspace (Dart 3.12+) + melos 7; config lives in the root `pubspec.yaml` (no melos.yaml). Resolve with `flutter pub get` at the root.

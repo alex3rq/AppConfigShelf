@@ -16,9 +16,21 @@ AppConfigShelf is a Flutter Desktop application for Windows that backs up and re
 
 ## Status
 
-**Pre-alpha — architecture and planning phase.** No releases yet.
+**Alpha.** The full pipeline works end-to-end: detection → selective backup (including custom folders/files) → `.acshelf` package → detection-gated, selective restore with undo bundles. The [community database](https://github.com/alex3rq/AppConfigShelf-DB) ships 66 entries and publishes signed releases the app verifies and downloads. Not yet recommended for production reinstalls — no binary releases published.
 
 The complete architecture and roadmap live in [`docs/plan/`](docs/plan/00-index.md).
+
+## Building from source
+
+Requires Flutter (stable) with Windows desktop support and Windows Developer Mode enabled (plugin symlinks).
+
+```
+flutter pub get
+cd apps/shelf_app
+flutter run -d windows
+```
+
+Engine tests (pure Dart): `cd packages/<name> && dart test` (set `FLUTTER_ROOT` when invoking plain `dart`).
 
 ## Planned highlights
 

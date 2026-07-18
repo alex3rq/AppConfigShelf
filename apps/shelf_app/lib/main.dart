@@ -1,13 +1,30 @@
+import 'dart:async';
+
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
 
 import 'features/backup/backup_page.dart';
 import 'features/database/database_page.dart';
 import 'features/restore/restore_page.dart';
 import 'features/scan/scan_page.dart';
+import 'shared/app_logging.dart';
 
 void main() {
-  runApp(const ProviderScope(child: ShelfApp()));
+  final logging = AppLogging.init();
+  final log = Logger('app');
+
+  FlutterError.onError = (details) {
+    logging.writeCrashReport(details.exception, details.stack ?? StackTrace.empty);
+    FlutterError.presentError(details);
+  };
+
+  runZonedGuarded(() {
+    log.info('AppConfigShelf starting');
+    runApp(const ProviderScope(child: ShelfApp()));
+  }, (error, stack) {
+    logging.writeCrashReport(error, stack);
+  });
 }
 
 class ShelfApp extends StatelessWidget {

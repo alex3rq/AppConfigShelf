@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  # Engine tests are pure Dart, but the pub workspace includes the Flutter
+  # app, so resolution needs the Flutter SDK. Linux runners are still the
+  # cheap path for the bulk of the tests.
+  test-engines:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart analyze
+      - name: Engine package tests (shelf_backup needs Windows paths — see build-windows job)
+        run: |
+          for pkg in shelf_core shelf_rules shelf_detect shelf_db; do
+            echo "== $pkg"
+            if [ -d "packages/$pkg/test" ]; then
+              (cd "packages/$pkg" && dart test)
+            fi
+          done
+      - name: Validator resolves and analyzes
+        working-directory: tools/db_validator
+        run: dart pub get && dart analyze
+
+  # Windows runner: real-filesystem semantics for shelf_backup + app build.
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Windows filesystem tests
+        run: cd packages/shelf_backup; dart test
+      - name: Build app
+        run: cd apps/shelf_app; flutter build windows --release
