@@ -235,6 +235,44 @@ void main() {
     expect(byId['notes']!.status, RestoreStatus.restorable);
     expect(plan.defaultSelection, {'vscode', 'notes'});
   });
+
+  test('unknown-id db entry restorable with flag when tokenized', () {
+    final manifest = PackageManifest(
+      createdAt: DateTime.now(),
+      appVersion: 't',
+      machine: const MachineInfo(hostname: 'h', windowsBuild: 'w'),
+      entries: [
+        ManifestEntry(
+          source: EntrySource.database,
+          id: 'my-local-app',
+          name: 'My Local App',
+          files: [
+            ManifestFile(
+              storedPath: 'apps/my-local-app/files/APPDATA/X/a.ini',
+              targetPath: r'%APPDATA%\X\a.ini',
+              sha256: 'aa',
+              size: 1,
+              modifiedAt: DateTime.now(),
+            ),
+          ],
+        ),
+        const ManifestEntry(
+            source: EntrySource.database, id: 'gone', name: 'Gone', files: []),
+      ],
+    );
+    final plan = planRestore(
+      manifest: manifest,
+      detectedEntryIds: const {},
+      fileSystem: _NothingExists(),
+      knownFolders: _FakeFolders(),
+      knownEntryIds: const {'gone'}, // 'gone' known but undetected
+    );
+    final byId = {for (final c in plan.candidates) c.entry.id: c};
+    expect(byId['my-local-app']!.status, RestoreStatus.restorable);
+    expect(byId['my-local-app']!.unknownEntry, isTrue);
+    expect(byId['gone']!.status, RestoreStatus.appMissing);
+    expect(byId['gone']!.unknownEntry, isFalse);
+  });
 }
 
 /// Rebuilds a zip, replacing the content of the member whose name ends with
@@ -267,4 +305,9 @@ final class _NothingExists implements FileSystemView {
 
   @override
   List<String> subdirectoryNames(String absolutePath) => const [];
+}
+
+final class _FakeFolders implements KnownFolderResolver {
+  @override
+  String resolve(KnownFolder folder) => r'C:\Users\t\R';
 }

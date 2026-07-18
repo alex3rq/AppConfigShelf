@@ -3,5 +3,6 @@
 library;
 
 export 'src/bundle.dart';
+export 'src/local_store.dart';
 export 'src/updater.dart';
 export 'src/verifier.dart';

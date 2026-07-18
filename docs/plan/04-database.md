@@ -63,6 +63,23 @@ risk: safe            # safe | caution | expert
 
 Fields planned: names, publishers, aliases, detection rules, AppData/LocalAppData/ProgramData/Documents paths, registry keys, ignore/cache folders, backup rules, restore rules, winget id, risk tier, future metadata.
 
+## Local entry library ("My library")
+
+Users can create and edit database entries inside the app, without touching
+the community repo:
+
+- Stored as one JSON file per entry (same shape as compiled db entries,
+  validated by the same `shelf_rules` parser) in
+  `%APPDATA%\AppConfigShelf\local-entries\`.
+- Created from the config finder ("Save to my library" — unknown apps become
+  detection-gated Recognized apps) or by **editing any official entry**,
+  which saves a customized copy under the same id.
+- Merge precedence: **local overrides win over official entries** — a
+  deliberate user edit beats upstream until the user resets it (delete the
+  override). Scan/backup/restore all consume the merged list.
+- Contributor bridge: any library entry exports as a YAML draft for a PR to
+  the db repo.
+
 ## Db repo layout
 
 ```

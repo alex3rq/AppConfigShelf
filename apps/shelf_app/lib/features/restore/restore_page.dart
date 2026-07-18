@@ -117,6 +117,8 @@ class _Selection extends ConsumerWidget {
               text: [
                 '  ${c.entry.files.length} files',
                 if (gated) '  · app not installed',
+                if (c.unknownEntry)
+                  '  · entry not in database — restores to recorded paths',
                 if (c.conflictCount > 0)
                   '  · ${c.conflictCount} existing will be replaced',
               ].join(),

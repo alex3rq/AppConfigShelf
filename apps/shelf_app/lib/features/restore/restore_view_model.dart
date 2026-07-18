@@ -71,6 +71,7 @@ class RestoreNotifier extends Notifier<RestoreUiState> {
       },
       fileSystem: const RealFileSystem(),
       knownFolders: folders,
+      knownEntryIds: {for (final e in entries) e.id},
     );
     state = RestoreSelecting(package, plan, plan.defaultSelection);
   }

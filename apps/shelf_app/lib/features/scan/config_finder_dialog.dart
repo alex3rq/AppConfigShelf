@@ -5,13 +5,16 @@ import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_detect/shelf_detect.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
-import '../backup/backup_view_model.dart';
+import '../database/db_providers.dart';
+import '../database/entry_draft.dart';
+import '../database/entry_editor_dialog.dart';
 
-enum _FinderOutcome { addedItem, copiedDraft }
+enum _FinderOutcome { savedToLibrary, copiedDraft }
 
 /// Shows heuristic config-folder candidates for an app the database doesn't
-/// know, and lets the user add one as a custom item and/or copy a draft
-/// database entry to contribute upstream.
+/// know. Primary flow: save the app to "My library" as a real database
+/// entry (detection-gated, appears as Recognized on the next scan).
+/// Secondary: copy a YAML draft for contributing to the community db.
 Future<void> showConfigFinderDialog(
     BuildContext context, WidgetRef ref, InstallEvidence evidence) async {
   final candidates = locateConfigCandidates(
@@ -31,9 +34,11 @@ Future<void> showConfigFinderDialog(
   final name = evidence.displayName ?? 'Unknown app';
   await displayInfoBar(context, builder: (context, close) {
     return switch (outcome) {
-      _FinderOutcome.addedItem => InfoBar(
-          title: Text('Added "$name" as a custom item'),
-          content: const Text('Select it on the Backup tab.'),
+      _FinderOutcome.savedToLibrary => InfoBar(
+          title: Text('"$name" saved to My library'),
+          content: const Text(
+              'It will appear under Recognized on the next scan, and can be '
+              'edited any time from the Database tab.'),
           severity: InfoBarSeverity.success,
           onClose: close,
         ),
@@ -59,8 +64,9 @@ class _ConfigFinderDialog extends ConsumerStatefulWidget {
 }
 
 class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
+  // A 100% match is pre-approved: pre-checked, save enabled immediately.
   late final Set<String> _selected = {
-    if (widget.candidates.isNotEmpty && widget.candidates.first.score >= 0.9)
+    if (widget.candidates.isNotEmpty && widget.candidates.first.score >= 1.0)
       widget.candidates.first.path.stored,
   };
 
@@ -113,66 +119,57 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
             onPressed: _selected.isEmpty ? null : _copyDraft,
             child: const Text('Copy db-entry draft'),
           ),
+          Button(
+            onPressed: _selected.isEmpty ? null : _editBeforeSaving,
+            child: const Text('Edit before saving…'),
+          ),
           FilledButton(
-            onPressed: _selected.isEmpty ? null : _addCustomItem,
-            child: const Text('Add as custom item'),
+            onPressed: _selected.isEmpty ? null : _saveToLibrary,
+            child: const Text('Save to my library'),
           ),
         ],
       ],
     );
   }
 
-  void _addCustomItem() {
-    final existing = {for (final i in ref.read(customItemsProvider)) i.slug};
-    var slug = normalizeAppName(_appName);
-    if (slug.isEmpty) slug = 'app';
-    var unique = slug;
+  AppEntry _buildEntry() {
+    final existingIds = {
+      for (final e in ref.read(localEntriesProvider).entries) e.id,
+    };
+    var id = normalizeAppName(_appName);
+    if (id.isEmpty) id = 'app';
+    var unique = id;
     var n = 2;
-    while (existing.contains(unique)) {
-      unique = '$slug-${n++}';
+    while (existingIds.contains(unique)) {
+      unique = '$id-${n++}';
     }
     final paths = [
       for (final c in widget.candidates)
         if (_selected.contains(c.path.stored)) c.path,
     ];
-    ref.read(customItemsProvider.notifier).add(CustomItem(
-          slug: unique,
-          name: _appName,
-          backup: [for (final p in paths) BackupRule(path: p)],
-        ));
-    Navigator.pop(context, _FinderOutcome.addedItem);
+    return AppEntry(
+      id: unique,
+      name: _appName,
+      publisher: widget.evidence.publisher,
+      detect: [PathDetection(paths.first)],
+      backup: [for (final p in paths) BackupRule(path: p)],
+    );
+  }
+
+  void _saveToLibrary() {
+    ref.read(localEntriesProvider.notifier).save(_buildEntry());
+    Navigator.pop(context, _FinderOutcome.savedToLibrary);
+  }
+
+  Future<void> _editBeforeSaving() async {
+    final edited = await showEntryEditorDialog(context, _buildEntry());
+    if (edited == null || !mounted) return;
+    ref.read(localEntriesProvider.notifier).save(edited);
+    Navigator.pop(context, _FinderOutcome.savedToLibrary);
   }
 
   Future<void> _copyDraft() async {
-    final id = normalizeAppName(_appName).isEmpty
-        ? 'app-id'
-        : normalizeAppName(_appName);
-    final buffer = StringBuffer()
-      ..writeln('id: $id')
-      ..writeln('name: $_appName');
-    if (widget.evidence.publisher != null) {
-      buffer.writeln('publisher: ${widget.evidence.publisher}');
-    }
-    buffer.writeln('detect:');
-    for (final c in widget.candidates) {
-      if (_selected.contains(c.path.stored)) {
-        buffer.writeln('  - path: "${c.path.stored.replaceAll(r'\', r'\\')}"');
-        break; // one detect probe is enough for a draft
-      }
-    }
-    buffer.writeln('backup:');
-    for (final c in widget.candidates) {
-      if (_selected.contains(c.path.stored)) {
-        buffer
-          ..writeln('  - path: "${c.path.stored.replaceAll(r'\', r'\\')}"')
-          ..writeln('    exclude: []   # TODO: exclude caches/logs');
-      }
-    }
-    buffer
-      ..writeln('risk: safe        # TODO: caution if profile/credentials')
-      ..writeln('origin: original');
-
-    await Clipboard.setData(ClipboardData(text: buffer.toString()));
+    await Clipboard.setData(ClipboardData(text: buildYamlDraft(_buildEntry())));
     if (!mounted) return;
     Navigator.pop(context, _FinderOutcome.copiedDraft);
   }

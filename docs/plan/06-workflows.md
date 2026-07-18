@@ -23,7 +23,7 @@ Policy: backup is **best-effort with report** — skip a locked file, record it,
    - *Complete restore:* everything restorable pre-checked.
    - *Selective restore:* user picks single apps, groups, or individual custom items.
    Selection simply filters the restore plan; the pipeline is identical for both modes.
-5. Per-entry status shown in the tree: **restorable** (app detected, or custom item), **app missing** (offer winget install later), **conflict** (existing config present → user picks overwrite / skip / keep-copy).
+5. Per-entry status shown in the tree: **restorable** (app detected, or custom item), **app missing** (offer winget install later), **conflict** (existing config present → user picks overwrite / skip / keep-copy). A db-sourced entry whose id the current database (official + local library) doesn't know — typically a "My library" entry from the old machine — is restorable with a warning ("entry not in database — restores to recorded paths") when all its targets are tokenized.
 6. Pre-restore checks: target apps not running (process detection); custom-item absolute paths verified to exist as roots.
 7. Execute: per entry, per file — token→path expansion, write to a staging temp location, then atomic move. Existing files are saved into a `.acshelf-undo` bundle first.
 8. Report: per-entry success/skip/fail, with an undo option. The undo bundle covers exactly what was restored (relevant for selective restores).

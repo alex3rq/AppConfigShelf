@@ -2,6 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_detect/shelf_detect.dart';
 
+import '../database/db_providers.dart';
 import 'config_finder_dialog.dart';
 import 'scan_view_model.dart';
 
@@ -47,6 +48,14 @@ class _ResultList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = FluentTheme.of(context);
+    final merged = ref.watch(mergedDbProvider).valueOrNull;
+    String badge(String? entryId) {
+      if (entryId == null || merged == null) return '';
+      if (merged.freshLocalIds.contains(entryId)) return '  ·  local';
+      if (merged.overriddenIds.contains(entryId)) return '  ·  customized';
+      return '';
+    }
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       children: [
@@ -58,7 +67,8 @@ class _ResultList extends ConsumerWidget {
             leading: const Icon(FluentIcons.check_mark),
             title: Text(app.displayName),
             subtitle: Text(
-                '${app.entryId}  ·  v${app.version ?? '?'}  ·  confidence ${(app.confidence * 100).round()}%'),
+                '${app.entryId}  ·  v${app.version ?? '?'}  ·  confidence ${(app.confidence * 100).round()}%'
+                '${badge(app.entryId)}'),
           ),
         const SizedBox(height: 16),
         Text('Not in database yet (${result.unknown.length})',
