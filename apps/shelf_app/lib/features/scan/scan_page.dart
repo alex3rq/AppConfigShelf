@@ -2,6 +2,12 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_detect/shelf_detect.dart';
 
+import '../../shared/widgets/origin_chip.dart';
+import '../../shared/widgets/page_header.dart';
+import '../../shared/widgets/risk_chip.dart';
+import '../../shared/widgets/shelf_card.dart';
+import '../../shell_index.dart';
+import '../../theme/shelf_theme.dart';
 import '../database/db_providers.dart';
 import 'config_finder_dialog.dart';
 import 'ignored_store.dart';
@@ -20,29 +26,45 @@ class ScanPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scan = ref.watch(scanProvider);
     return ScaffoldPage(
-      header: PageHeader(
-        title: const Text('Installed applications'),
-        commandBar: CommandBar(
-          mainAxisAlignment: MainAxisAlignment.end,
-          primaryItems: [
-            CommandBarButton(
-              icon: const Icon(FluentIcons.search),
-              label: const Text('Scan system'),
+      padding: EdgeInsets.zero,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ShelfPageHeader(
+            title: 'Applications',
+            subtitle:
+                'Everything the scan found, and what the database knows about it.',
+            trailing: FilledButton(
               onPressed: scan.isLoading
                   ? null
                   : () => ref.read(scanProvider.notifier).scan(),
+              child: const Text('Scan system'),
             ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: switch (scan) {
+              AsyncData(value: null) => const _EmptyState(),
+              AsyncData(:final value?) => _ResultList(result: value),
+              AsyncError(:final error) =>
+                Center(child: Text('Scan failed: $error')),
+              _ => const Center(child: ProgressRing()),
+            },
+          ),
+        ],
       ),
-      content: switch (scan) {
-        AsyncData(value: null) => const Center(
-            child: Text('Run a scan to detect installed applications.')),
-        AsyncData(:final value?) => _ResultList(result: value),
-        AsyncError(:final error) =>
-          Center(child: Text('Scan failed: $error')),
-        _ => const Center(child: ProgressRing()),
-      },
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
+    return Center(
+      child: Text('Run a scan to detect installed applications.',
+          style: ShelfType.body.copyWith(color: p.textSecondary)),
     );
   }
 }
@@ -54,15 +76,18 @@ class _ResultList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = FluentTheme.of(context);
+    final p = ShelfTokens.of(context);
     final merged = ref.watch(mergedDbProvider).valueOrNull;
     final ignoreMatcher = ref.watch(_ignoreMatcherProvider).valueOrNull;
     final hiddenNames = ref.watch(ignoredNamesProvider);
-    String badge(String? entryId) {
-      if (entryId == null || merged == null) return '';
-      if (merged.freshLocalIds.contains(entryId)) return '  ·  local';
-      if (merged.overriddenIds.contains(entryId)) return '  ·  customized';
-      return '';
+
+    ChipOrigin? origin(String? entryId) {
+      if (entryId == null || merged == null) return null;
+      if (merged.freshLocalIds.contains(entryId)) return ChipOrigin.local;
+      if (merged.overriddenIds.contains(entryId)) {
+        return ChipOrigin.customized;
+      }
+      return null; // Official entries carry no chip in the list.
     }
 
     // Split unknowns: visible / officially ignored / hidden by user.
@@ -80,81 +105,234 @@ class _ResultList extends ConsumerWidget {
       }
     }
     final hiddenCount = officialIgnored.length + userHidden.length;
+    final found = result.detected.length + result.unknown.length;
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(
+          ShelfSpacing.xl, 0, ShelfSpacing.xl, ShelfSpacing.xl),
       children: [
-        Text('Recognized (${result.detected.length})',
-            style: theme.typography.subtitle),
-        const SizedBox(height: 8),
-        for (final app in result.detected)
-          ListTile(
-            leading: const Icon(FluentIcons.check_mark),
-            title: Text(app.displayName),
-            subtitle: Text(
-                '${app.entryId}  ·  v${app.version ?? '?'}  ·  confidence ${(app.confidence * 100).round()}%'
-                '${badge(app.entryId)}'),
+        Wrap(
+          spacing: ShelfSpacing.sm,
+          children: [
+            ShelfChip(label: '$found found'),
+            ShelfChip(
+                label: '${result.detected.length} recognized',
+                color: p.success),
+            ShelfChip(
+                label: '${visible.length} not in database', color: p.caution),
+            ShelfChip(label: '$hiddenCount hidden'),
+          ],
+        ),
+        const SizedBox(height: ShelfSpacing.lg),
+        Row(
+          children: [
+            Expanded(
+              child: Text('Recognized (${result.detected.length})',
+                  style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
+            ),
+            HyperlinkButton(
+              onPressed: () => ref.read(shellIndexProvider.notifier).state =
+                  ShellTab.backup,
+              child: const Text('Add all to backup'),
+            ),
+          ],
+        ),
+        const SizedBox(height: ShelfSpacing.sm),
+        ShelfCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (final (i, app) in result.detected.indexed)
+                _AppRow(
+                  first: i == 0,
+                  name: app.displayName,
+                  detail:
+                      '${app.entryId}  ·  ${app.version ?? '?'}',
+                  chips: [
+                    if (origin(app.entryId) case final o?)
+                      OriginChip(origin: o),
+                  ],
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('match ${(app.confidence * 100).round()}%',
+                          style: ShelfType.caption
+                              .copyWith(color: p.textSecondary)),
+                      const SizedBox(width: ShelfSpacing.md),
+                      HyperlinkButton(
+                        onPressed: () => ref
+                            .read(shellIndexProvider.notifier)
+                            .state = ShellTab.backup,
+                        child: const Text('Add to backup'),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
-        const SizedBox(height: 16),
-        Text('Not in database yet (${visible.length})',
-            style: theme.typography.subtitle),
-        const SizedBox(height: 8),
-        for (final evidence in visible)
-          ListTile(
-            leading: const Icon(FluentIcons.unknown),
-            title: Text(evidence.displayName ?? '(unnamed)'),
-            subtitle: Text([
-              if (evidence.publisher != null) evidence.publisher!,
-              if (evidence.version != null) 'v${evidence.version}',
-            ].join('  ·  ')),
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              Button(
-                onPressed: () =>
-                    showConfigFinderDialog(context, ref, evidence),
-                child: const Text('Find config…'),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(FluentIcons.hide3),
-                onPressed: evidence.displayName == null
-                    ? null
-                    : () => ref
-                        .read(ignoredNamesProvider.notifier)
-                        .hide(evidence.displayName!),
-              ),
-            ]),
+        ),
+        const SizedBox(height: ShelfSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: Text('Not in database yet (${visible.length})',
+                  style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
+            ),
+            Text('Teach AppConfigShelf where these keep their settings',
+                style: ShelfType.caption.copyWith(color: p.textSecondary)),
+          ],
+        ),
+        const SizedBox(height: ShelfSpacing.sm),
+        ShelfCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (final (i, evidence) in visible.indexed)
+                _AppRow(
+                  first: i == 0,
+                  name: evidence.displayName ?? '(unnamed)',
+                  detail: [
+                    if (evidence.publisher != null) evidence.publisher!,
+                    if (evidence.version != null) evidence.version!,
+                  ].join(' · '),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Button(
+                        onPressed: () =>
+                            showConfigFinderDialog(context, ref, evidence),
+                        child: const Text('Find config…'),
+                      ),
+                      const SizedBox(width: ShelfSpacing.sm),
+                      HyperlinkButton(
+                        onPressed: evidence.displayName == null
+                            ? null
+                            : () => ref
+                                .read(ignoredNamesProvider.notifier)
+                                .hide(evidence.displayName!),
+                        child: const Text('Hide'),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
+        ),
         if (hiddenCount > 0) ...[
-          const SizedBox(height: 16),
-          Expander(
-            header: Text('Hidden ($hiddenCount)'),
-            content: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final evidence in userHidden)
-                  ListTile(
-                    leading: const Icon(FluentIcons.hide3, size: 14),
-                    title: Text(evidence.displayName ?? '(unnamed)'),
-                    subtitle: const Text('hidden by you'),
-                    trailing: Button(
-                      onPressed: () => ref
-                          .read(ignoredNamesProvider.notifier)
-                          .unhide(evidence.displayName!),
-                      child: const Text('Unhide'),
+          const SizedBox(height: ShelfSpacing.xl),
+          ShelfCard(
+            padding: EdgeInsets.zero,
+            child: Expander(
+              header: Row(
+                children: [
+                  Text('Hidden ($hiddenCount)',
+                      style:
+                          ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
+                  const SizedBox(width: ShelfSpacing.md),
+                  Text(
+                    '${userHidden.length} hidden by you · '
+                    '${officialIgnored.length} system components ignored by '
+                    'database rules',
+                    style:
+                        ShelfType.caption.copyWith(color: p.textSecondary),
+                  ),
+                ],
+              ),
+              content: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final evidence in userHidden)
+                    _AppRow(
+                      name: evidence.displayName ?? '(unnamed)',
+                      detail: 'hidden by you',
+                      trailing: HyperlinkButton(
+                        onPressed: () => ref
+                            .read(ignoredNamesProvider.notifier)
+                            .unhide(evidence.displayName!),
+                        child: const Text('Unhide'),
+                      ),
                     ),
-                  ),
-                for (final evidence in officialIgnored)
-                  ListTile(
-                    leading: const Icon(FluentIcons.system, size: 14),
-                    title: Text(evidence.displayName ?? '(unnamed)'),
-                    subtitle: const Text(
-                        'system component — matched a database ignore rule'),
-                  ),
-              ],
+                  for (final evidence in officialIgnored)
+                    _AppRow(
+                      name: evidence.displayName ?? '(unnamed)',
+                      detail:
+                          'system component — matched a database ignore rule',
+                    ),
+                ],
+              ),
             ),
           ),
         ],
       ],
+    );
+  }
+}
+
+/// One application row: letter avatar, name + mono detail line, chips,
+/// trailing actions. Rows separate with a top stroke inside a ShelfCard.
+class _AppRow extends StatelessWidget {
+  const _AppRow({
+    required this.name,
+    required this.detail,
+    this.chips = const [],
+    this.trailing,
+    this.first = false,
+  });
+
+  final String name;
+  final String detail;
+  final List<Widget> chips;
+  final Widget? trailing;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: ShelfSpacing.lg, vertical: ShelfSpacing.md),
+      decoration: first
+          ? null
+          : BoxDecoration(border: Border(top: BorderSide(color: p.stroke))),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: p.card,
+              borderRadius:
+                  BorderRadius.circular(ShelfSpacing.controlRadius),
+            ),
+            child: Text(name.isEmpty ? '?' : name[0].toUpperCase(),
+                style: ShelfType.caption
+                    .copyWith(color: p.textSecondary)),
+          ),
+          const SizedBox(width: ShelfSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style:
+                        ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
+                if (detail.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(detail,
+                      style:
+                          ShelfType.mono.copyWith(color: p.textSecondary)),
+                ],
+              ],
+            ),
+          ),
+          for (final chip in chips) ...[
+            chip,
+            const SizedBox(width: ShelfSpacing.sm),
+          ],
+          ?trailing,
+        ],
+      ),
     );
   }
 }

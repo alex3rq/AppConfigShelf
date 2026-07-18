@@ -3,6 +3,12 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart';
 
+import '../../shared/widgets/footer_action_bar.dart';
+import '../../shared/widgets/page_header.dart';
+import '../../shared/widgets/risk_chip.dart';
+import '../../shared/widgets/shelf_card.dart';
+import '../../shared/widgets/wizard_steps.dart';
+import '../../theme/shelf_theme.dart';
 import '../database/db_providers.dart';
 import '../scan/scan_view_model.dart';
 import 'backup_view_model.dart';
@@ -16,6 +22,7 @@ class BackupPage extends ConsumerStatefulWidget {
 
 class _BackupPageState extends ConsumerState<BackupPage> {
   final _selectedApps = <String>{};
+  String _filter = '';
 
   @override
   Widget build(BuildContext context) {
@@ -31,93 +38,168 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     final detectedEntries =
         [for (final e in dbEntries) if (detectedIds.contains(e.id)) e];
 
+    final step = switch (run) {
+      BackupIdle() => 0,
+      BackupRunning() => 1,
+      BackupDone() || BackupFailed() => 2,
+    };
+
     return ScaffoldPage(
-      header: PageHeader(
-        title: const Text('Create backup'),
-        commandBar: CommandBar(
-          mainAxisAlignment: MainAxisAlignment.end,
-          primaryItems: [
-            CommandBarButton(
-              icon: const Icon(FluentIcons.save),
-              label: const Text('Back up selection'),
-              onPressed: run is BackupRunning ||
-                      (_selectedApps.isEmpty && customItems.isEmpty)
-                  ? null
-                  : () => _startBackup(detectedEntries, customItems),
-            ),
-          ],
-        ),
-      ),
-      content: switch (run) {
-        BackupRunning() => _Progress(run: run),
-        BackupDone() => _Report(run: run, onBack: () {
-            ref.read(backupRunProvider.notifier).reset();
-          }),
-        BackupFailed(:final error) => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Backup failed: $error'),
-                const SizedBox(height: 8),
-                Button(
-                  onPressed: () =>
-                      ref.read(backupRunProvider.notifier).reset(),
-                  child: const Text('Back'),
-                ),
-              ],
+      padding: EdgeInsets.zero,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ShelfPageHeader(
+            title: 'Back up',
+            subtitle:
+                'Choose what travels with you. Nothing is written until you confirm.',
+            trailing: WizardSteps(
+              labels: const ['Select', 'Back up', 'Done'],
+              current: step,
             ),
           ),
-        BackupIdle() => _buildSelection(detectedEntries, customItems),
-      },
+          Expanded(
+            child: switch (run) {
+              BackupRunning() => _Progress(run: run),
+              BackupDone() => _Report(run: run, onBack: () {
+                  ref.read(backupRunProvider.notifier).reset();
+                }),
+              BackupFailed(:final error) => _Failed(
+                  error: error,
+                  onBack: () =>
+                      ref.read(backupRunProvider.notifier).reset()),
+              BackupIdle() => _buildSelection(detectedEntries, customItems),
+            },
+          ),
+          if (run is BackupIdle)
+            _SelectionFooter(
+              selectedApps: [
+                for (final e in detectedEntries)
+                  if (_selectedApps.contains(e.id)) e
+              ],
+              customItems: customItems,
+              onStart: () => _startBackup(detectedEntries, customItems),
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildSelection(
       List<AppEntry> detectedEntries, List<CustomItem> customItems) {
-    final theme = FluentTheme.of(context);
+    final p = ShelfTokens.of(context);
+    final filtered = [
+      for (final e in detectedEntries)
+        if (_filter.isEmpty ||
+            e.name.toLowerCase().contains(_filter.toLowerCase()))
+          e
+    ];
+    final allSelected = detectedEntries.isNotEmpty &&
+        detectedEntries.every((e) => _selectedApps.contains(e.id));
+
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(
+          ShelfSpacing.xl, 0, ShelfSpacing.xl, ShelfSpacing.xl),
       children: [
-        Text('Detected applications', style: theme.typography.subtitle),
-        const SizedBox(height: 4),
-        if (detectedEntries.isEmpty)
-          const Text('Run a scan first (Applications tab).'),
-        for (final entry in detectedEntries)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Checkbox(
-              checked: _selectedApps.contains(entry.id),
-              onChanged: (v) => setState(() {
-                v! ? _selectedApps.add(entry.id) : _selectedApps.remove(entry.id);
-              }),
-              content: Text(entry.name),
-            ),
-          ),
-        const SizedBox(height: 16),
         Row(
           children: [
-            Text('Custom items', style: theme.typography.subtitle),
-            const SizedBox(width: 12),
+            Checkbox(
+              checked: allSelected,
+              onChanged: detectedEntries.isEmpty
+                  ? null
+                  : (v) => setState(() {
+                        if (v ?? false) {
+                          _selectedApps
+                              .addAll([for (final e in detectedEntries) e.id]);
+                        } else {
+                          _selectedApps.clear();
+                        }
+                      }),
+              content: Text(
+                'Detected applications — ${_selectedApps.length} of '
+                '${detectedEntries.length} selected',
+                style: ShelfType.bodyStrong.copyWith(color: p.textPrimary),
+              ),
+            ),
+            const Spacer(),
+            SizedBox(
+              width: 200,
+              child: TextBox(
+                placeholder: 'Filter apps',
+                onChanged: (v) => setState(() => _filter = v),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: ShelfSpacing.sm),
+        if (detectedEntries.isEmpty)
+          ShelfCard(
+            child: Text('Run a scan first (Applications tab).',
+                style: ShelfType.body.copyWith(color: p.textSecondary)),
+          )
+        else
+          ShelfCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (final (i, entry) in filtered.indexed)
+                  _SelectRow(
+                    first: i == 0,
+                    checked: _selectedApps.contains(entry.id),
+                    onChanged: (v) => setState(() {
+                      v
+                          ? _selectedApps.add(entry.id)
+                          : _selectedApps.remove(entry.id);
+                    }),
+                    name: entry.name,
+                    detail: entry.id,
+                    trailing: RiskChip(risk: entry.risk),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: ShelfSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: Text('Custom items — restored to their original paths',
+                  style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
+            ),
             Button(
               onPressed: _addCustomItem,
               child: const Text('Add folder…'),
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: ShelfSpacing.sm),
         if (customItems.isEmpty)
-          const Text(
-              'Add any folder or file to back up, even if no app is detected. '
-              'Custom items are always restored to their original location.'),
-        for (final item in customItems)
-          ListTile(
-            leading: const Icon(FluentIcons.folder),
-            title: Text(item.name),
-            subtitle: Text(item.backup.map((r) => r.path.stored).join(', ')),
-            trailing: IconButton(
-              icon: const Icon(FluentIcons.delete),
-              onPressed: () =>
-                  ref.read(customItemsProvider.notifier).remove(item.slug),
+          ShelfCard(
+            child: Text(
+                'Add any folder or file to back up, even if no app is '
+                'detected. Custom items are always restored to their '
+                'original location.',
+                style: ShelfType.caption.copyWith(color: p.textSecondary)),
+          )
+        else
+          ShelfCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (final (i, item) in customItems.indexed)
+                  _SelectRow(
+                    first: i == 0,
+                    checked: true,
+                    name: item.name,
+                    detail:
+                        item.backup.map((r) => r.path.stored).join(', '),
+                    trailing: HyperlinkButton(
+                      onPressed: () => ref
+                          .read(customItemsProvider.notifier)
+                          .remove(item.slug),
+                      child: const Text('Remove'),
+                    ),
+                  ),
+              ],
             ),
           ),
       ],
@@ -211,6 +293,109 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 }
 
+/// Checkbox row inside a ShelfCard list.
+class _SelectRow extends StatelessWidget {
+  const _SelectRow({
+    required this.name,
+    required this.detail,
+    required this.checked,
+    this.onChanged,
+    this.trailing,
+    this.first = false,
+  });
+
+  final String name;
+  final String detail;
+  final bool checked;
+  final ValueChanged<bool>? onChanged;
+  final Widget? trailing;
+  final bool first;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: ShelfSpacing.lg, vertical: ShelfSpacing.md),
+      decoration: first
+          ? null
+          : BoxDecoration(border: Border(top: BorderSide(color: p.stroke))),
+      child: Row(
+        children: [
+          Checkbox(
+            checked: checked,
+            onChanged:
+                onChanged == null ? null : (v) => onChanged!(v ?? false),
+          ),
+          const SizedBox(width: ShelfSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    style:
+                        ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
+                if (detail.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(detail,
+                      style:
+                          ShelfType.mono.copyWith(color: p.textSecondary)),
+                ],
+              ],
+            ),
+          ),
+          ?trailing,
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectionFooter extends StatelessWidget {
+  const _SelectionFooter({
+    required this.selectedApps,
+    required this.customItems,
+    required this.onStart,
+  });
+
+  final List<AppEntry> selectedApps;
+  final List<CustomItem> customItems;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
+    final cautionCount = selectedApps
+        .where((e) => e.risk != RiskTier.safe)
+        .length;
+    return FooterActionBar(
+      summary: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${selectedApps.length} apps · ${customItems.length} custom items',
+            style: ShelfType.bodyStrong.copyWith(color: p.textPrimary),
+          ),
+          if (cautionCount > 0)
+            Text(
+              '$cautionCount caution/expert ${cautionCount == 1 ? 'item' : 'items'} selected — review before restoring on another PC',
+              style: ShelfType.caption.copyWith(color: p.caution),
+            ),
+        ],
+      ),
+      note: const Text(
+          'Writes one .acshelf file · nothing on this PC is changed'),
+      action: FilledButton(
+        onPressed: selectedApps.isEmpty && customItems.isEmpty
+            ? null
+            : onStart,
+        child: const Text('Back up selection'),
+      ),
+    );
+  }
+}
+
 class _Progress extends StatelessWidget {
   const _Progress({required this.run});
 
@@ -218,16 +403,52 @@ class _Progress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
+    return Center(
+      child: ShelfCard(
+        padding: const EdgeInsets.all(ShelfSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Backing up…',
+                style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
+            const SizedBox(height: ShelfSpacing.lg),
+            SizedBox(
+              width: 360,
+              child: ProgressBar(
+                  value: run.filesTotal == 0
+                      ? null
+                      : run.filesDone * 100 / run.filesTotal),
+            ),
+            const SizedBox(height: ShelfSpacing.md),
+            Text(
+                '${run.currentEntry} — ${run.filesDone}/${run.filesTotal} files',
+                style: ShelfType.caption.copyWith(color: p.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Failed extends StatelessWidget {
+  const _Failed({required this.error, required this.onBack});
+
+  final Object error;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ProgressBar(
-              value: run.filesTotal == 0
-                  ? null
-                  : run.filesDone * 100 / run.filesTotal),
-          const SizedBox(height: 12),
-          Text('${run.currentEntry} — ${run.filesDone}/${run.filesTotal} files'),
+          Text('Backup failed: $error',
+              style: ShelfType.body.copyWith(color: p.danger)),
+          const SizedBox(height: ShelfSpacing.sm),
+          Button(onPressed: onBack, child: const Text('Back')),
         ],
       ),
     );
@@ -242,30 +463,83 @@ class _Report extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = FluentTheme.of(context);
+    final p = ShelfTokens.of(context);
     final entries = run.manifest.entries;
-    final totalFiles =
-        entries.fold(0, (sum, e) => sum + e.files.length);
-    final totalSkipped =
-        entries.fold(0, (sum, e) => sum + e.skipped.length);
+    final totalFiles = entries.fold(0, (sum, e) => sum + e.files.length);
+    final totalSkipped = entries.fold(0, (sum, e) => sum + e.skipped.length);
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(
+          ShelfSpacing.xl, 0, ShelfSpacing.xl, ShelfSpacing.xl),
       children: [
-        Text('Backup complete', style: theme.typography.subtitle),
-        const SizedBox(height: 4),
-        Text('Saved to ${run.outputPath}'),
-        Text('$totalFiles files across ${entries.length} entries'
-            '${totalSkipped > 0 ? ' · $totalSkipped skipped' : ''}'),
-        const SizedBox(height: 12),
-        for (final entry in entries) ...[
-          Text(entry.name, style: theme.typography.bodyStrong),
-          Text('  ${entry.files.length} files'
-              '${entry.skipped.isNotEmpty ? ' · ${entry.skipped.length} skipped' : ''}'),
-          for (final skip in entry.skipped)
-            Text('  ⚠ ${skip.targetPath} (${skip.reason})'),
-          const SizedBox(height: 8),
-        ],
-        Button(onPressed: onBack, child: const Text('New backup')),
+        ShelfCard(
+          tinted: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Backup complete',
+                  style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
+              const SizedBox(height: ShelfSpacing.xs),
+              Text(run.outputPath,
+                  style: ShelfType.mono.copyWith(color: p.textSecondary)),
+              const SizedBox(height: ShelfSpacing.xs),
+              Text(
+                  '$totalFiles files across ${entries.length} entries'
+                  '${totalSkipped > 0 ? ' · $totalSkipped skipped' : ''}',
+                  style: ShelfType.caption.copyWith(color: p.textSecondary)),
+            ],
+          ),
+        ),
+        const SizedBox(height: ShelfSpacing.lg),
+        ShelfCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (final (i, entry) in entries.indexed)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: ShelfSpacing.lg,
+                      vertical: ShelfSpacing.md),
+                  decoration: i == 0
+                      ? null
+                      : BoxDecoration(
+                          border:
+                              Border(top: BorderSide(color: p.stroke))),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(entry.name,
+                                style: ShelfType.bodyStrong
+                                    .copyWith(color: p.textPrimary)),
+                          ),
+                          Text(
+                              '${entry.files.length} files'
+                              '${entry.skipped.isNotEmpty ? ' · ${entry.skipped.length} skipped' : ''}',
+                              style: ShelfType.caption
+                                  .copyWith(color: p.textSecondary)),
+                        ],
+                      ),
+                      for (final skip in entry.skipped)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                              '⚠ ${skip.targetPath} (${skip.reason})',
+                              style: ShelfType.mono
+                                  .copyWith(color: p.caution)),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: ShelfSpacing.lg),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Button(onPressed: onBack, child: const Text('New backup')),
+        ),
       ],
     );
   }

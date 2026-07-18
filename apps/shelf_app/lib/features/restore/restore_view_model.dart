@@ -5,6 +5,7 @@ import 'package:shelf_detect/shelf_detect.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
 import '../database/db_providers.dart';
+import '../home/history_store.dart';
 
 sealed class RestoreUiState {
   const RestoreUiState();
@@ -119,6 +120,14 @@ class RestoreNotifier extends Notifier<RestoreUiState> {
               failures.add(event);
             case RestoreFinished():
               state = RestoreComplete(event, failures);
+              if (event.undoPath case final undoPath?) {
+                ref.read(historyProvider.notifier).record(HistoryEvent(
+                      kind: HistoryKind.undoBundle,
+                      path: undoPath,
+                      timestamp: DateTime.now(),
+                      summary: 'rolls back ${selected.length} entries',
+                    ));
+              }
           }
         }
       } catch (e) {
