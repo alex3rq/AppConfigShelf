@@ -102,7 +102,7 @@ class RestoreNotifier extends Notifier<RestoreUiState> {
           package: package,
           selectedEntryIds: selected,
           knownFolders: folders,
-          io: const RealRestoreIo(),
+          io: RealRestoreIo(),
           undoDirectory: undoDir,
           conflictMode: conflictMode,
         )) {

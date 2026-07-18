@@ -28,7 +28,7 @@ Future<void> main(List<String> args) async {
     package: package,
     selectedEntryIds: {'smoke'}, // selective: leave aimp alone
     knownFolders: WindowsKnownFolderResolver(),
-    io: const RealRestoreIo(),
+    io: RealRestoreIo(),
     undoDirectory: '$dir\\undo',
   )) {
     if (event case RestoreFinished(:final restoredFiles, :final failedEntries)) {

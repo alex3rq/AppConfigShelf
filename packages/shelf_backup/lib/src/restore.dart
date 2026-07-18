@@ -31,7 +31,10 @@ abstract interface class RestoreIo {
 }
 
 final class RealRestoreIo implements RestoreIo {
-  const RealRestoreIo();
+  RealRestoreIo();
+
+  /// Directories already verified free of link components this run.
+  final _checkedDirs = <String>{};
 
   @override
   bool exists(String absolutePath) =>
@@ -50,19 +53,34 @@ final class RealRestoreIo implements RestoreIo {
   @override
   void writeFileAtomic(String absolutePath, List<int> bytes) {
     final file = File(absolutePath);
+    _ensureNoLinkComponents(file.parent);
     file.parent.createSync(recursive: true);
-    // Resolve the parent and require it to stay inside itself after symlink
-    // resolution: a junction planted at a target directory must not redirect
-    // writes elsewhere (docs/plan/10-security.md).
-    final resolvedParent = file.parent.resolveSymbolicLinksSync();
-    if (resolvedParent.toLowerCase() != file.parent.path.toLowerCase()) {
-      throw FileSystemException(
-          'target directory is a junction/symlink to $resolvedParent — refusing to write',
-          absolutePath);
-    }
     final temp = File('$absolutePath.acshelf-tmp');
     temp.writeAsBytesSync(bytes, flush: true);
     temp.renameSync(absolutePath);
+  }
+
+  /// A junction/symlink planted anywhere along the target directory chain
+  /// must not redirect restore writes elsewhere (docs/plan/10-security.md).
+  /// Checks every existing ancestor for a reparse point. String comparison
+  /// of resolved paths is NOT used — 8.3 short names make it unreliable.
+  void _ensureNoLinkComponents(Directory parent) {
+    var current = parent.absolute;
+    final toMark = <String>[];
+    while (true) {
+      final key = current.path.toLowerCase();
+      if (_checkedDirs.contains(key)) break;
+      final parentDir = current.parent;
+      if (parentDir.path == current.path) break; // drive root
+      if (FileSystemEntity.isLinkSync(current.path)) {
+        throw FileSystemException(
+            'restore target directory chain contains a junction/symlink — refusing to write',
+            current.path);
+      }
+      toMark.add(key);
+      current = parentDir;
+    }
+    _checkedDirs.addAll(toMark);
   }
 }
 

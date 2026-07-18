@@ -50,7 +50,7 @@ void main() {
       package: package,
       selectedEntryIds: {'item'},
       knownFolders: _NoKnownFolders(),
-      io: const RealRestoreIo(),
+      io: RealRestoreIo(),
       undoDirectory: p.join(temp.path, 'undo'),
     ).toList();
 
@@ -100,7 +100,7 @@ void main() {
       package: package,
       selectedEntryIds: {'bb'},
       knownFolders: _NoKnownFolders(),
-      io: const RealRestoreIo(),
+      io: RealRestoreIo(),
       undoDirectory: p.join(temp.path, 'undo'),
     ).drain<void>();
 
@@ -122,7 +122,7 @@ void main() {
       package: package,
       selectedEntryIds: {'cfg'},
       knownFolders: _NoKnownFolders(),
-      io: const RealRestoreIo(),
+      io: RealRestoreIo(),
       undoDirectory: p.join(temp.path, 'undo'),
     ).toList();
 
@@ -146,7 +146,7 @@ void main() {
       package: package,
       selectedEntryIds: {'cfg2'},
       knownFolders: _NoKnownFolders(),
-      io: const RealRestoreIo(),
+      io: RealRestoreIo(),
       undoDirectory: p.join(temp.path, 'undo'),
       conflictMode: ConflictMode.skipExisting,
     ).toList();
@@ -173,7 +173,7 @@ void main() {
       package: package,
       selectedEntryIds: {'cor'},
       knownFolders: _NoKnownFolders(),
-      io: const RealRestoreIo(),
+      io: RealRestoreIo(),
       undoDirectory: p.join(temp.path, 'undo'),
     ).toList();
 
@@ -182,6 +182,31 @@ void main() {
     expect(File(p.join(src.path, 'f.txt')).existsSync(), isFalse,
         reason: 'nothing must be written from a corrupted package');
   });
+
+  test('refuses to write through a directory symlink/junction', () async {
+    final realTarget = Directory(p.join(temp.path, 'real'))..createSync();
+    final src = Directory(p.join(temp.path, 'linked'))..createSync();
+    File(p.join(src.path, 'f.txt')).writeAsStringSync('x');
+    final packagePath = await makePackage(src.path, slug: 'lnk');
+    // Replace the original directory with a link pointing elsewhere —
+    // the junction-planting attack restore must refuse.
+    src.deleteSync(recursive: true);
+    Link(src.path).createSync(realTarget.path);
+
+    final events = await executeRestore(
+      package: PackageReader.open(packagePath).valueOrNull!,
+      selectedEntryIds: {'lnk'},
+      knownFolders: _NoKnownFolders(),
+      io: RealRestoreIo(),
+      undoDirectory: p.join(temp.path, 'undo'),
+    ).toList();
+
+    final failed = events.whereType<RestoreEntryFailed>().single;
+    expect(failed.reason, contains('junction/symlink'));
+    expect(File(p.join(realTarget.path, 'f.txt')).existsSync(), isFalse,
+        reason: 'nothing may be written through the link');
+    Link(src.path).deleteSync(); // allow tearDown cleanup
+  }, testOn: 'windows');
 
   test('planRestore gates db entries on detection, customs always restorable',
       () {

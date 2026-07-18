@@ -76,7 +76,7 @@ void main() {
       package: package,
       selectedEntryIds: {'workload'},
       knownFolders: _None(),
-      io: const RealRestoreIo(),
+      io: RealRestoreIo(),
       undoDirectory: p.join(temp.path, 'undo'),
     ).toList();
     final finished = events.whereType<RestoreFinished>().single;
