@@ -14,8 +14,10 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart' as c;
 import 'package:cryptography/cryptography.dart';
+import 'package:glob/glob.dart';
 import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_rules/shelf_rules.dart';
+import 'package:yaml/yaml.dart';
 
 const schemaVersion = 1;
 
@@ -94,8 +96,40 @@ Future<void> main(List<String> args) async {
     entries.add(entry);
   }
 
+  // Optional ignore patterns file (display-name globs).
+  final ignorePatterns = <String>[];
+  if (options.ignorePath != null) {
+    final ignoreFile = File(options.ignorePath!);
+    if (!ignoreFile.existsSync()) {
+      stderr.writeln('ignore file not found: ${options.ignorePath}');
+      exit(2);
+    }
+    final doc = loadYaml(ignoreFile.readAsStringSync());
+    if (doc is! List) {
+      stderr.writeln('ERROR ignore file must be a YAML list of patterns');
+      errorCount += 1;
+    } else {
+      for (final item in doc) {
+        if (item is! String || item.trim().isEmpty) {
+          stderr.writeln('ERROR ignore pattern must be a non-empty string: $item');
+          errorCount += 1;
+          continue;
+        }
+        try {
+          Glob(item);
+        } on FormatException catch (e) {
+          stderr.writeln("ERROR invalid ignore glob '$item': ${e.message}");
+          errorCount += 1;
+          continue;
+        }
+        ignorePatterns.add(item);
+      }
+    }
+  }
+
   stdout.writeln(
-      '${files.length} files, ${entries.length} valid entries, $errorCount errors, $warningCount warnings');
+      '${files.length} files, ${entries.length} valid entries, '
+      '${ignorePatterns.length} ignore patterns, $errorCount errors, $warningCount warnings');
   if (errorCount > 0) exit(1);
 
   final compilePath = options.compilePath;
@@ -105,6 +139,7 @@ Future<void> main(List<String> args) async {
       'schemaVersion': schemaVersion,
       'contentVersion': options.contentVersion ?? 'dev',
       'entries': [for (final e in entries) appEntryToJson(e)],
+      if (ignorePatterns.isNotEmpty) 'ignore': ignorePatterns,
     };
     final out = File(compilePath);
     out.parent.createSync(recursive: true);
@@ -148,6 +183,7 @@ final class _Options {
     this.contentVersion,
     this.signPath,
     this.versionFilePath,
+    this.ignorePath,
   });
 
   final String? entriesDir;
@@ -155,10 +191,11 @@ final class _Options {
   final String? contentVersion;
   final String? signPath;
   final String? versionFilePath;
+  final String? ignorePath;
 }
 
 _Options? _parseArgs(List<String> args) {
-  String? entries, compile, contentVersion, sign, versionFile;
+  String? entries, compile, contentVersion, sign, versionFile, ignore;
   for (var i = 0; i < args.length; i += 2) {
     if (i + 1 >= args.length) return null;
     final value = args[i + 1];
@@ -173,6 +210,8 @@ _Options? _parseArgs(List<String> args) {
         sign = value;
       case '--version-file':
         versionFile = value;
+      case '--ignore':
+        ignore = value;
       default:
         return null;
     }
@@ -187,7 +226,10 @@ _Options? _parseArgs(List<String> args) {
   }
   if (entries == null) return null;
   return _Options(
-      entriesDir: entries, compilePath: compile, contentVersion: contentVersion);
+      entriesDir: entries,
+      compilePath: compile,
+      contentVersion: contentVersion,
+      ignorePath: ignore);
 }
 
 List<int> _fromHex(String hex) => [

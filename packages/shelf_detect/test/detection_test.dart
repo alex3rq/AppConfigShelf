@@ -42,6 +42,34 @@ void main() {
       expect(evidence.single.version, '24.08');
       expect(evidence.single.registryKeyPath, contains('7zip'));
     });
+
+    test('skips SystemComponent, ParentKeyName, and ReleaseType entries', () {
+      final registry = FakeRegistry({
+        '$_uninstallRoot\\RealApp': {'DisplayName': 'Real App'},
+        '$_uninstallRoot\\Component': {
+          'DisplayName': 'VC++ Runtime Component',
+          'SystemComponent': 1,
+        },
+        '$_uninstallRoot\\NotComponent': {
+          'DisplayName': 'Marked But Zero',
+          'SystemComponent': 0,
+        },
+        '$_uninstallRoot\\Update': {
+          'DisplayName': 'Security Update for App',
+          'ParentKeyName': 'App',
+        },
+        '$_uninstallRoot\\Hotfix': {
+          'DisplayName': 'Hotfix',
+          'ReleaseType': 'Update',
+        },
+      });
+      final names = RegistryUninstallDetector(registry)
+          .detect()
+          .map((e) => e.displayName)
+          .toList();
+      expect(names, containsAll(['Real App', 'Marked But Zero']));
+      expect(names, hasLength(2));
+    });
   });
 
   group('PathProbeDetector', () {

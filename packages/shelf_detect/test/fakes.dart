@@ -1,12 +1,13 @@
 import 'package:shelf_core/shelf_core.dart';
 
-/// In-memory registry: keys mapped to {valueName: value}.
+/// In-memory registry: keys mapped to {valueName: value}. String values as
+/// String, DWORDs as int.
 final class FakeRegistry implements RegistryView {
   FakeRegistry(this._keys);
 
   /// Original-case key paths, matched case-insensitively like the real
   /// registry.
-  final Map<String, Map<String, String>> _keys;
+  final Map<String, Map<String, Object>> _keys;
 
   String? _find(String keyPath) {
     final wanted = keyPath.toUpperCase();
@@ -33,7 +34,15 @@ final class FakeRegistry implements RegistryView {
   @override
   String? stringValue(String keyPath, String valueName) {
     final key = _find(keyPath);
-    return key == null ? null : _keys[key]?[valueName];
+    final value = key == null ? null : _keys[key]?[valueName];
+    return value is String ? value : null;
+  }
+
+  @override
+  int? dwordValue(String keyPath, String valueName) {
+    final key = _find(keyPath);
+    final value = key == null ? null : _keys[key]?[valueName];
+    return value is int ? value : null;
   }
 }
 

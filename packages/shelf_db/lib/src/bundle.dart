@@ -12,11 +12,17 @@ final class DbBundle {
     required this.schemaVersion,
     required this.contentVersion,
     required this.entries,
+    this.ignorePatterns = const [],
   });
 
   final int schemaVersion;
   final String contentVersion;
   final List<AppEntry> entries;
+
+  /// Display-name glob patterns for software that is never a backup
+  /// candidate (redistributables, SDKs, drivers). Optional bundle field —
+  /// older bundles simply have none.
+  final List<String> ignorePatterns;
 
   /// Parses and validates a compiled bundle. Entries that fail to parse are
   /// dropped (they may use future minor extensions); the bundle fails only
@@ -52,10 +58,14 @@ final class DbBundle {
       final entry = outcome.value;
       if (entry != null) entries.add(entry);
     }
+    final rawIgnore = decoded['ignore'];
     return Result.ok(DbBundle(
       schemaVersion: schemaVersion,
       contentVersion: decoded['contentVersion'] as String? ?? 'unknown',
       entries: entries,
+      ignorePatterns: rawIgnore is List
+          ? [for (final p in rawIgnore) if (p is String) p]
+          : const [],
     ));
   }
 }

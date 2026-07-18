@@ -63,6 +63,18 @@ risk: safe            # safe | caution | expert
 
 Fields planned: names, publishers, aliases, detection rules, AppData/LocalAppData/ProgramData/Documents paths, registry keys, ignore/cache folders, backup rules, restore rules, winget id, risk tier, future metadata.
 
+## Ignore list
+
+`ignore.yaml` at the db repo root: case-insensitive display-name glob
+patterns for software that is never a backup candidate (runtimes,
+redistributables, SDKs, drivers). Compiled into the bundle as an optional
+`ignore` array (schema stays v1 — old readers skip unknown fields). The app
+moves matching unknown apps into a collapsed "Hidden" section; users also
+have a personal hide list (`%APPDATA%\AppConfigShelf\ignored.json`, exact
+names). Independently, the registry detector honors Windows conventions:
+uninstall entries with `SystemComponent=1`, `ParentKeyName`, or
+`ReleaseType` are never emitted at all (Control Panel precedent).
+
 ## Local entry library ("My library")
 
 Users can create and edit database entries inside the app, without touching

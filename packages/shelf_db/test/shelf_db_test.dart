@@ -40,6 +40,17 @@ void main() {
     test('rejects non-JSON', () {
       expect(DbBundle.parse('nope').isOk, isFalse);
     });
+
+    test('reads optional ignore patterns, absent means empty', () {
+      final withIgnore = DbBundle.parse(
+              '{"schemaVersion":1,"entries":[],"ignore":["VC++ *","SDK*"]}')
+          .valueOrNull!;
+      expect(withIgnore.ignorePatterns, ['VC++ *', 'SDK*']);
+
+      final without =
+          DbBundle.parse('{"schemaVersion":1,"entries":[]}').valueOrNull!;
+      expect(without.ignorePatterns, isEmpty);
+    });
   });
 
   group('verifyBundle', () {

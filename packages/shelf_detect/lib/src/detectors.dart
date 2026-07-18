@@ -30,6 +30,11 @@ final class RegistryUninstallDetector implements Detector {
         final displayName = _registry.stringValue(keyPath, 'DisplayName');
         // Entries without a DisplayName are updates/components, not apps.
         if (displayName == null || displayName.isEmpty) continue;
+        // Windows conventions: SystemComponent=1 is hidden from
+        // Control Panel; ParentKeyName/ReleaseType mark per-app updates.
+        if (_registry.dwordValue(keyPath, 'SystemComponent') == 1) continue;
+        if (_registry.stringValue(keyPath, 'ParentKeyName') != null) continue;
+        if (_registry.stringValue(keyPath, 'ReleaseType') != null) continue;
         evidence.add(InstallEvidence(
           source: EvidenceSource.registryUninstall,
           displayName: displayName,

@@ -5,5 +5,6 @@ library;
 export 'src/config_locator.dart';
 export 'src/detectors.dart';
 export 'src/evidence.dart';
+export 'src/ignore.dart';
 export 'src/resolver.dart';
 export 'src/scan.dart';

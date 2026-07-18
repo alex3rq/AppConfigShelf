@@ -16,6 +16,10 @@ abstract interface class RegistryView {
   /// A string (REG_SZ/REG_EXPAND_SZ) value, or null when the key or value
   /// is missing or has another type.
   String? stringValue(String keyPath, String valueName);
+
+  /// A DWORD/QWORD value, or null when the key or value is missing or has
+  /// another type.
+  int? dwordValue(String keyPath, String valueName);
 }
 
 /// Read-only view of the filesystem, path arguments already resolved to

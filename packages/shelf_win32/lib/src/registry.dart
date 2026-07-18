@@ -51,4 +51,8 @@ final class WindowsRegistryView implements RegistryView {
   @override
   String? stringValue(String keyPath, String valueName) =>
       _withKey(keyPath, (key) => key.getString(valueName));
+
+  @override
+  int? dwordValue(String keyPath, String valueName) =>
+      _withKey(keyPath, (key) => key.getInt(valueName));
 }
