@@ -1,13 +1,17 @@
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart' as fs;
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart';
 
+import '../../shared/format.dart';
 import '../../shared/widgets/footer_action_bar.dart';
 import '../../shared/widgets/page_header.dart';
 import '../../shared/widgets/risk_chip.dart';
 import '../../shared/widgets/shelf_card.dart';
 import '../../shared/widgets/wizard_steps.dart';
+import '../../shell_index.dart';
 import '../../theme/shelf_theme.dart';
 import '../database/db_providers.dart';
 import '../scan/scan_view_model.dart';
@@ -23,6 +27,7 @@ class BackupPage extends ConsumerStatefulWidget {
 class _BackupPageState extends ConsumerState<BackupPage> {
   final _selectedApps = <String>{};
   String _filter = '';
+  String? _outputPath;
 
   @override
   Widget build(BuildContext context) {
@@ -51,8 +56,9 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         children: [
           ShelfPageHeader(
             title: 'Back up',
-            subtitle:
-                'Choose what travels with you. Nothing is written until you confirm.',
+            subtitle: run is BackupRunning
+                ? 'Writing your backup — you can keep using this PC.'
+                : 'Choose what travels with you. Nothing is written until you confirm.',
             trailing: WizardSteps(
               labels: const ['Select', 'Back up', 'Done'],
               current: step,
@@ -60,7 +66,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
           ),
           Expanded(
             child: switch (run) {
-              BackupRunning() => _Progress(run: run),
+              BackupRunning() =>
+                _Progress(run: run, outputPath: _outputPath),
               BackupDone() => _Report(run: run, onBack: () {
                   ref.read(backupRunProvider.notifier).reset();
                 }),
@@ -282,6 +289,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       ],
     );
     if (location == null) return;
+    setState(() => _outputPath = location.path);
 
     final apps =
         [for (final e in detectedEntries) if (_selectedApps.contains(e.id)) e];
@@ -397,9 +405,10 @@ class _SelectionFooter extends StatelessWidget {
 }
 
 class _Progress extends StatelessWidget {
-  const _Progress({required this.run});
+  const _Progress({required this.run, required this.outputPath});
 
   final BackupRunning run;
+  final String? outputPath;
 
   @override
   Widget build(BuildContext context) {
@@ -407,25 +416,36 @@ class _Progress extends StatelessWidget {
     return Center(
       child: ShelfCard(
         padding: const EdgeInsets.all(ShelfSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Backing up…',
-                style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
-            const SizedBox(height: ShelfSpacing.lg),
-            SizedBox(
-              width: 360,
-              child: ProgressBar(
+        child: SizedBox(
+          width: 560,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const ProgressRing(),
+              const SizedBox(height: ShelfSpacing.lg),
+              Text('Backing up ${run.currentEntry}…',
+                  style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
+              const SizedBox(height: ShelfSpacing.sm),
+              Text('${run.filesDone} of ${run.filesTotal} files',
+                  style: ShelfType.caption.copyWith(color: p.textSecondary)),
+              const SizedBox(height: ShelfSpacing.md),
+              ProgressBar(
                   value: run.filesTotal == 0
                       ? null
                       : run.filesDone * 100 / run.filesTotal),
-            ),
-            const SizedBox(height: ShelfSpacing.md),
-            Text(
-                '${run.currentEntry} — ${run.filesDone}/${run.filesTotal} files',
-                style: ShelfType.caption.copyWith(color: p.textSecondary)),
-          ],
+              if (outputPath != null) ...[
+                const SizedBox(height: ShelfSpacing.md),
+                Text('→ $outputPath',
+                    style: ShelfType.mono.copyWith(color: p.textSecondary)),
+              ],
+              const SizedBox(height: ShelfSpacing.sm),
+              Text(
+                  'Files locked by running apps are skipped safely and '
+                  'listed in the report.',
+                  style: ShelfType.caption.copyWith(color: p.textSecondary)),
+            ],
+          ),
         ),
       ),
     );
@@ -455,92 +475,149 @@ class _Failed extends StatelessWidget {
   }
 }
 
-class _Report extends StatelessWidget {
+class _Report extends ConsumerWidget {
   const _Report({required this.run, required this.onBack});
 
   final BackupDone run;
   final VoidCallback onBack;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final p = ShelfTokens.of(context);
     final entries = run.manifest.entries;
     final totalFiles = entries.fold(0, (sum, e) => sum + e.files.length);
-    final totalSkipped = entries.fold(0, (sum, e) => sum + e.skipped.length);
+    final totalBytes = entries.fold(
+        0, (sum, e) => sum + e.files.fold(0, (s, f) => s + f.size));
+    final skipped = [
+      for (final e in entries)
+        for (final s in e.skipped) s
+    ];
     return ListView(
       padding: const EdgeInsets.fromLTRB(
           ShelfSpacing.xl, 0, ShelfSpacing.xl, ShelfSpacing.xl),
       children: [
-        ShelfCard(
-          tinted: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Backup complete',
-                  style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
-              const SizedBox(height: ShelfSpacing.xs),
-              Text(run.outputPath,
-                  style: ShelfType.mono.copyWith(color: p.textSecondary)),
-              const SizedBox(height: ShelfSpacing.xs),
-              Text(
-                  '$totalFiles files across ${entries.length} entries'
-                  '${totalSkipped > 0 ? ' · $totalSkipped skipped' : ''}',
-                  style: ShelfType.caption.copyWith(color: p.textSecondary)),
-            ],
+        const SizedBox(height: ShelfSpacing.lg),
+        Center(
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: p.success.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(FluentIcons.check_mark, size: 24, color: p.success),
           ),
+        ),
+        const SizedBox(height: ShelfSpacing.md),
+        Center(
+          child: Text('Backup complete',
+              style: ShelfType.title.copyWith(color: p.textPrimary)),
+        ),
+        const SizedBox(height: ShelfSpacing.xs),
+        Center(
+          child: Text(
+              '${entries.length} entries · $totalFiles files · '
+              '${formatBytes(totalBytes)}',
+              style: ShelfType.caption.copyWith(color: p.textSecondary)),
         ),
         const SizedBox(height: ShelfSpacing.lg),
         ShelfCard(
           padding: EdgeInsets.zero,
           child: Column(
             children: [
-              for (final (i, entry) in entries.indexed)
+              Padding(
+                padding: const EdgeInsets.all(ShelfSpacing.lg),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Saved to',
+                              style: ShelfType.caption
+                                  .copyWith(color: p.textSecondary)),
+                          const SizedBox(height: 2),
+                          Text(run.outputPath,
+                              style: ShelfType.mono
+                                  .copyWith(color: p.textPrimary)),
+                        ],
+                      ),
+                    ),
+                    Button(
+                      onPressed: () => _openFolder(run.outputPath),
+                      child: const Text('Open folder'),
+                    ),
+                  ],
+                ),
+              ),
+              for (final entry in entries)
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: ShelfSpacing.lg,
                       vertical: ShelfSpacing.md),
-                  decoration: i == 0
-                      ? null
-                      : BoxDecoration(
-                          border:
-                              Border(top: BorderSide(color: p.stroke))),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: p.stroke))),
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(entry.name,
-                                style: ShelfType.bodyStrong
-                                    .copyWith(color: p.textPrimary)),
-                          ),
-                          Text(
-                              '${entry.files.length} files'
-                              '${entry.skipped.isNotEmpty ? ' · ${entry.skipped.length} skipped' : ''}',
-                              style: ShelfType.caption
-                                  .copyWith(color: p.textSecondary)),
-                        ],
+                      Expanded(
+                        child: Text(
+                            entry.source == EntrySource.custom
+                                ? '${entry.name} (custom)'
+                                : entry.name,
+                            style: ShelfType.bodyStrong
+                                .copyWith(color: p.textPrimary)),
                       ),
-                      for (final skip in entry.skipped)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                              '⚠ ${skip.targetPath} (${skip.reason})',
-                              style: ShelfType.mono
-                                  .copyWith(color: p.caution)),
-                        ),
+                      Text(
+                          '${entry.files.length} files · '
+                          '${formatBytes(entry.files.fold(0, (s, f) => s + f.size))}',
+                          style: ShelfType.caption
+                              .copyWith(color: p.textSecondary)),
                     ],
                   ),
                 ),
             ],
           ),
         ),
+        if (skipped.isNotEmpty) ...[
+          const SizedBox(height: ShelfSpacing.lg),
+          ShelfCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                    '${skipped.length} ${skipped.length == 1 ? 'file' : 'files'} skipped',
+                    style: ShelfType.bodyStrong.copyWith(color: p.caution)),
+                const SizedBox(height: ShelfSpacing.sm),
+                for (final skip in skipped)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text('${skip.targetPath} — ${skip.reason}',
+                        style: ShelfType.mono.copyWith(color: p.caution)),
+                  ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: ShelfSpacing.lg),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Button(onPressed: onBack, child: const Text('New backup')),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FilledButton(onPressed: onBack, child: const Text('New backup')),
+            const SizedBox(width: ShelfSpacing.sm),
+            Button(
+              onPressed: () {
+                onBack();
+                ref.read(shellIndexProvider.notifier).state = ShellTab.home;
+              },
+              child: const Text('Go home'),
+            ),
+          ],
         ),
       ],
     );
+  }
+
+  void _openFolder(String path) {
+    Process.run('explorer.exe', ['/select,', path]);
   }
 }

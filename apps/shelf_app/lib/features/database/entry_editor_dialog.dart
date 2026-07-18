@@ -4,6 +4,8 @@ import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_rules/shelf_rules.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
+import '../../theme/shelf_theme.dart';
+
 /// Editable form for a database entry (official or local). Validation runs
 /// through the real parser, so anything the editor accepts the engines
 /// accept. Returns the edited entry, or null on cancel.
@@ -74,10 +76,23 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = FluentTheme.of(context);
+    final p = ShelfTokens.of(context);
+    final errorCount = _error == null
+        ? 0
+        : _error!.split('\n').where((l) => l.trim().isNotEmpty).length;
     return ContentDialog(
-      constraints: const BoxConstraints(maxWidth: 640, maxHeight: 640),
-      title: Text('Edit entry — ${widget.entry.id}'),
+      constraints: const BoxConstraints(maxWidth: 640, maxHeight: 680),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Edit entry — ${widget.entry.name}'),
+          const SizedBox(height: ShelfSpacing.xs),
+          Text(
+              'Saved to My library only — the official database entry is '
+              'never modified.',
+              style: ShelfType.caption.copyWith(color: p.textSecondary)),
+        ],
+      ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -87,79 +102,47 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
               label: 'Display name',
               child: TextBox(controller: _name),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ShelfSpacing.sm),
             InfoLabel(
-              label: 'Detect path (app is "installed" when this exists)',
-              child: TextBox(
-                controller: _detectPath,
-                placeholder: r'%APPDATA%\MyApp\config.ini',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(children: [
-              Text('Backup locations', style: theme.typography.bodyStrong),
-              const SizedBox(width: 8),
-              Button(
-                onPressed: _addRuleFromPicker,
-                child: const Text('Add folder…'),
-              ),
-            ]),
-            for (var i = 0; i < _rules.length; i++) ...[
-              const SizedBox(height: 8),
-              Card(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                        child: InfoLabel(
-                          label: 'Path',
-                          child: TextBox(
-                            controller: _rules[i].path,
-                            placeholder: r'%APPDATA%\MyApp',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(FluentIcons.delete),
-                        onPressed: _rules.length == 1
-                            ? null
-                            : () => setState(() {
-                                  _rules.removeAt(i).dispose();
-                                }),
-                      ),
-                    ]),
-                    const SizedBox(height: 6),
-                    InfoLabel(
-                      label: 'Exclude patterns (one per line, e.g. Cache/**)',
-                      child: TextBox(
-                          controller: _rules[i].exclude,
-                          maxLines: 2,
-                          minLines: 1),
-                    ),
-                    const SizedBox(height: 6),
-                    InfoLabel(
-                      label: 'Include patterns (one per line; empty = everything)',
-                      child: TextBox(
-                          controller: _rules[i].include,
-                          maxLines: 2,
-                          minLines: 1),
-                    ),
-                    const SizedBox(height: 6),
-                    Checkbox(
-                      checked: _rules[i].optional,
-                      onChanged: (v) =>
-                          setState(() => _rules[i].optional = v!),
-                      content: const Text('Optional (unchecked by default)'),
-                    ),
-                  ],
+              label: 'Detect path',
+              child: Row(children: [
+                Expanded(
+                  child: TextBox(
+                    controller: _detectPath,
+                    placeholder: r'%APPDATA%\MyApp\config.ini',
+                  ),
                 ),
+                const SizedBox(width: ShelfSpacing.sm),
+                Button(
+                    onPressed: _browseDetectPath,
+                    child: const Text('Browse…')),
+              ]),
+            ),
+            const SizedBox(height: ShelfSpacing.xs),
+            Text('The entry is used only when this file exists on the PC.',
+                style: ShelfType.caption.copyWith(color: p.textSecondary)),
+            const SizedBox(height: ShelfSpacing.md),
+            Text('Backup locations',
+                style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
+            for (var i = 0; i < _rules.length; i++) ...[
+              const SizedBox(height: ShelfSpacing.sm),
+              _RuleCard(
+                fields: _rules[i],
+                canRemove: _rules.length > 1,
+                onRemove: () => setState(() {
+                  _rules.removeAt(i).dispose();
+                }),
+                onOptionalChanged: (v) =>
+                    setState(() => _rules[i].optional = v),
               ),
             ],
+            const SizedBox(height: ShelfSpacing.sm),
+            HyperlinkButton(
+              onPressed: _addRuleFromPicker,
+              child: const Text('+ Add backup location…'),
+            ),
             if (_error != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: ShelfSpacing.sm),
               InfoBar(
                 title: const Text('Cannot save'),
                 content: Text(_error!),
@@ -174,12 +157,47 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
+        if (errorCount > 0)
+          Center(
+            child: Text(
+                '$errorCount ${errorCount == 1 ? 'issue' : 'issues'} to fix',
+                style: ShelfType.caption.copyWith(color: p.danger)),
+          ),
         FilledButton(
           onPressed: _save,
-          child: const Text('Save'),
+          child: const Text('Save to my library'),
         ),
       ],
     );
+  }
+
+  Future<void> _browseDetectPath() async {
+    final file = await fs.openFile();
+    if (file == null) return;
+    // Db entries store tokenized paths only.
+    final tokenized = _tokenize(file.path);
+    if (tokenized == null) {
+      setState(() => _error =
+          'That file is outside the supported locations (AppData, '
+          'LocalAppData, ProgramData, user profile, Documents).');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _detectPath.text = tokenized;
+    });
+  }
+
+  static String? _tokenize(String absolute) {
+    final folders = WindowsKnownFolderResolver();
+    for (final folder in KnownFolder.values) {
+      final root = folders.resolve(folder);
+      if (absolute.toLowerCase().startsWith(root.toLowerCase())) {
+        final rest = absolute.substring(root.length).replaceAll('/', r'\');
+        return '${folder.token}$rest';
+      }
+    }
+    return null;
   }
 
   Future<void> _addRuleFromPicker() async {
@@ -187,16 +205,7 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
     if (dir == null) return;
     // Re-tokenize picked absolute paths when they live under a known folder;
     // db entries cannot carry absolute paths.
-    final folders = WindowsKnownFolderResolver();
-    String? tokenized;
-    for (final folder in KnownFolder.values) {
-      final root = folders.resolve(folder);
-      if (dir.toLowerCase().startsWith(root.toLowerCase())) {
-        final rest = dir.substring(root.length).replaceAll('/', r'\');
-        tokenized = '${folder.token}$rest';
-        break;
-      }
-    }
+    final tokenized = _tokenize(dir);
     if (tokenized == null) {
       setState(() => _error =
           'That folder is outside the supported locations (AppData, '
@@ -206,7 +215,7 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
     }
     setState(() {
       _error = null;
-      _rules.add(_RuleFields.empty()..path.text = tokenized!);
+      _rules.add(_RuleFields.empty()..path.text = tokenized);
     });
   }
 
@@ -257,4 +266,106 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
         for (final line in controller.text.split(RegExp(r'[\n,]')))
           if (line.trim().isNotEmpty) line.trim(),
       ];
+}
+
+class _RuleCard extends StatelessWidget {
+  const _RuleCard({
+    required this.fields,
+    required this.canRemove,
+    required this.onRemove,
+    required this.onOptionalChanged,
+  });
+
+  final _RuleFields fields;
+  final bool canRemove;
+  final VoidCallback onRemove;
+  final ValueChanged<bool> onOptionalChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
+    return Container(
+      padding: const EdgeInsets.all(ShelfSpacing.md),
+      decoration: BoxDecoration(
+        color: p.card,
+        borderRadius: BorderRadius.circular(ShelfSpacing.cardRadius),
+        border: Border.all(color: p.stroke),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+              child: InfoLabel(
+                label: 'Folder',
+                child: TextBox(
+                  controller: fields.path,
+                  placeholder: r'%APPDATA%\MyApp',
+                ),
+              ),
+            ),
+            const SizedBox(width: ShelfSpacing.sm),
+            IconButton(
+              icon: const Icon(FluentIcons.delete),
+              onPressed: canRemove ? onRemove : null,
+            ),
+          ]),
+          const SizedBox(height: ShelfSpacing.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    InfoLabel(
+                      label: 'Include patterns',
+                      child: TextBox(
+                          controller: fields.include,
+                          maxLines: 2,
+                          minLines: 1,
+                          placeholder: '**/*.json, snippets/**'),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                        'Patterns like **/*.json — leave empty to include '
+                        'everything',
+                        style: ShelfType.caption
+                            .copyWith(color: p.textSecondary)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: ShelfSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    InfoLabel(
+                      label: 'Exclude patterns',
+                      child: TextBox(
+                          controller: fields.exclude,
+                          maxLines: 2,
+                          minLines: 1,
+                          placeholder: 'Cache/**'),
+                    ),
+                    const SizedBox(height: 2),
+                    Text('Skipped even when matched by Include',
+                        style: ShelfType.caption
+                            .copyWith(color: p.textSecondary)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: ShelfSpacing.sm),
+          ToggleSwitch(
+            checked: fields.optional,
+            onChanged: onOptionalChanged,
+            content: const Text(
+                'Optional — skip silently when this folder is missing'),
+          ),
+        ],
+      ),
+    );
+  }
 }

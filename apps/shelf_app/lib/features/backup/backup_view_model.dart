@@ -5,6 +5,7 @@ import 'package:shelf_backup/shelf_backup.dart';
 import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
+import '../../shared/format.dart';
 import '../home/history_store.dart';
 import 'custom_items_store.dart';
 
@@ -121,17 +122,8 @@ class BackupRunNotifier extends Notifier<BackupRunState> {
           summary: [
             '$apps apps',
             if (customItems > 0) '$customItems custom items',
-            if (size != null) _formatBytes(size),
+            if (size != null) formatBytes(size),
           ].join(' · '),
         ));
   }
-}
-
-String _formatBytes(int bytes) {
-  if (bytes >= 1 << 30) {
-    return '${(bytes / (1 << 30)).toStringAsFixed(1)} GB';
-  }
-  if (bytes >= 1 << 20) return '${(bytes / (1 << 20)).round()} MB';
-  if (bytes >= 1 << 10) return '${(bytes / (1 << 10)).round()} KB';
-  return '$bytes B';
 }

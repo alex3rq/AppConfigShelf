@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart' as fs;
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,7 @@ import '../../shared/widgets/page_header.dart';
 import '../../shared/widgets/risk_chip.dart';
 import '../../shared/widgets/shelf_card.dart';
 import '../../shared/widgets/wizard_steps.dart';
+import '../../shell_index.dart';
 import '../../theme/shelf_theme.dart';
 import 'restore_view_model.dart';
 
@@ -405,53 +408,123 @@ class _Report extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final p = ShelfTokens.of(context);
     final f = state.finished;
+    final clean = f.failedEntries.isEmpty;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
           ShelfSpacing.xl, 0, ShelfSpacing.xl, ShelfSpacing.xl),
       children: [
-        ShelfCard(
-          tinted: f.failedEntries.isEmpty,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                  f.failedEntries.isEmpty
-                      ? 'Restore complete'
-                      : 'Restore finished with problems',
-                  style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
-              const SizedBox(height: ShelfSpacing.xs),
-              Text(
-                  '${f.restoredFiles} files restored'
-                  '${f.skippedFiles > 0 ? ' · ${f.skippedFiles} kept as-is' : ''}',
-                  style: ShelfType.caption.copyWith(color: p.textSecondary)),
-            ],
+        const SizedBox(height: ShelfSpacing.lg),
+        Center(
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: (clean ? p.success : p.caution).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(clean ? FluentIcons.check_mark : FluentIcons.warning,
+                size: 24, color: clean ? p.success : p.caution),
           ),
         ),
-        if (f.undoPath != null) ...[
-          const SizedBox(height: ShelfSpacing.md),
-          InfoBar(
-            title: const Text('Undo available'),
-            content: Text(
-                'Files that were replaced are saved in ${f.undoPath}. '
-                'Open it like any backup to roll back.'),
-            severity: InfoBarSeverity.info,
-          ),
-        ],
-        for (final failure in state.entryFailures) ...[
-          const SizedBox(height: ShelfSpacing.md),
-          InfoBar(
-            title: Text('${failure.entryId} halted'),
-            content: Text(failure.reason),
-            severity: InfoBarSeverity.warning,
-          ),
-        ],
         const SizedBox(height: ShelfSpacing.md),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Button(
-            onPressed: () => ref.read(restoreProvider.notifier).reset(),
-            child: const Text('Restore another backup'),
+        Center(
+          child: Text(
+              clean ? 'Restore complete' : 'Restore finished with problems',
+              style: ShelfType.title.copyWith(color: p.textPrimary)),
+        ),
+        const SizedBox(height: ShelfSpacing.xs),
+        Center(
+          child: Text(
+              '${f.restoredFiles} files restored'
+              '${f.skippedFiles > 0 ? ' · ${f.skippedFiles} kept (newer on this PC)' : ''}',
+              style: ShelfType.caption.copyWith(color: p.textSecondary)),
+        ),
+        if (f.undoPath case final undoPath?) ...[
+          const SizedBox(height: ShelfSpacing.lg),
+          ShelfCard(
+            tinted: true,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Undo bundle saved — this restore can be rolled back',
+                          style: ShelfType.bodyStrong
+                              .copyWith(color: p.textPrimary)),
+                      const SizedBox(height: ShelfSpacing.xs),
+                      Text(undoPath,
+                          style:
+                              ShelfType.mono.copyWith(color: p.textSecondary)),
+                      const SizedBox(height: ShelfSpacing.xs),
+                      Text(
+                          'Open it like any backup to return this PC to '
+                          'exactly how it was before the restore.',
+                          style: ShelfType.caption
+                              .copyWith(color: p.textSecondary)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: ShelfSpacing.md),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Button(
+                      onPressed: () async {
+                        ref.read(restoreProvider.notifier).reset();
+                        await ref
+                            .read(restoreProvider.notifier)
+                            .openPackage(undoPath);
+                      },
+                      child: const Text('Roll back now…'),
+                    ),
+                    const SizedBox(height: ShelfSpacing.xs),
+                    HyperlinkButton(
+                      onPressed: () =>
+                          Process.run('explorer.exe', ['/select,', undoPath]),
+                      child: const Text('Show in folder'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
+        ],
+        if (state.entryFailures.isNotEmpty) ...[
+          const SizedBox(height: ShelfSpacing.lg),
+          ShelfCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final failure in state.entryFailures) ...[
+                  Text('${failure.entryId} — halted',
+                      style: ShelfType.bodyStrong.copyWith(color: p.caution)),
+                  const SizedBox(height: 2),
+                  Text(failure.reason,
+                      style: ShelfType.mono.copyWith(color: p.caution)),
+                  const SizedBox(height: ShelfSpacing.sm),
+                ],
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: ShelfSpacing.lg),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FilledButton(
+              onPressed: () {
+                ref.read(restoreProvider.notifier).reset();
+                ref.read(shellIndexProvider.notifier).state = ShellTab.home;
+              },
+              child: const Text('Done'),
+            ),
+            const SizedBox(width: ShelfSpacing.sm),
+            Button(
+              onPressed: () => ref.read(restoreProvider.notifier).reset(),
+              child: const Text('Open another backup'),
+            ),
+          ],
         ),
       ],
     );

@@ -5,6 +5,8 @@ import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_detect/shelf_detect.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
+import '../../shared/widgets/risk_chip.dart';
+import '../../theme/shelf_theme.dart';
 import '../database/db_providers.dart';
 import '../database/entry_draft.dart';
 import '../database/entry_editor_dialog.dart';
@@ -74,10 +76,10 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = FluentTheme.of(context);
+    final p = ShelfTokens.of(context);
     return ContentDialog(
       constraints: const BoxConstraints(maxWidth: 560),
-      title: Text('Find config — $_appName'),
+      title: Text('Find configuration — $_appName'),
       content: widget.candidates.isEmpty
           ? const Text(
               'No likely config folders found under AppData, LocalAppData, or '
@@ -89,24 +91,27 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                    'Likely config locations (best guesses — verify before '
-                    'relying on them):',
-                    style: theme.typography.body),
-                const SizedBox(height: 8),
+                    'AppConfigShelf looked in the usual places. Check the '
+                    'folders that hold this app\'s settings.',
+                    style:
+                        ShelfType.caption.copyWith(color: p.textSecondary)),
+                const SizedBox(height: ShelfSpacing.md),
                 for (final candidate in widget.candidates.take(8))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Checkbox(
-                      checked: _selected.contains(candidate.path.stored),
-                      onChanged: (v) => setState(() {
-                        v!
-                            ? _selected.add(candidate.path.stored)
-                            : _selected.remove(candidate.path.stored);
-                      }),
-                      content: Text(
-                          '${candidate.path.stored}   ·   match ${(candidate.score * 100).round()}%'),
-                    ),
+                  _CandidateRow(
+                    candidate: candidate,
+                    checked: _selected.contains(candidate.path.stored),
+                    onChanged: (v) => setState(() {
+                      v
+                          ? _selected.add(candidate.path.stored)
+                          : _selected.remove(candidate.path.stored);
+                    }),
                   ),
+                const SizedBox(height: ShelfSpacing.sm),
+                Text(
+                    'Nothing here? Settings may live in the registry or the '
+                    'install folder — add them as a custom item from Backup.',
+                    style:
+                        ShelfType.caption.copyWith(color: p.textSecondary)),
               ],
             ),
       actions: [
@@ -117,7 +122,7 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
         if (widget.candidates.isNotEmpty) ...[
           Button(
             onPressed: _selected.isEmpty ? null : _copyDraft,
-            child: const Text('Copy db-entry draft'),
+            child: const Text('Copy db-entry draft (YAML)'),
           ),
           Button(
             onPressed: _selected.isEmpty ? null : _editBeforeSaving,
@@ -172,5 +177,54 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
     await Clipboard.setData(ClipboardData(text: buildYamlDraft(_buildEntry())));
     if (!mounted) return;
     Navigator.pop(context, _FinderOutcome.copiedDraft);
+  }
+}
+
+class _CandidateRow extends StatelessWidget {
+  const _CandidateRow({
+    required this.candidate,
+    required this.checked,
+    required this.onChanged,
+  });
+
+  final ConfigCandidate candidate;
+  final bool checked;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
+    final lowConfidence = candidate.score < 0.5;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ShelfSpacing.sm),
+      child: HoverButton(
+        onPressed: () => onChanged(!checked),
+        builder: (context, states) => Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: ShelfSpacing.md, vertical: ShelfSpacing.sm),
+          decoration: BoxDecoration(
+            color: checked ? p.accent.withValues(alpha: 0.08) : p.card,
+            borderRadius: BorderRadius.circular(ShelfSpacing.controlRadius),
+            border: Border.all(color: checked ? p.accent : p.stroke),
+          ),
+          child: Row(
+            children: [
+              Checkbox(checked: checked, onChanged: (v) => onChanged(v!)),
+              const SizedBox(width: ShelfSpacing.sm),
+              Expanded(
+                child: Text(candidate.path.stored,
+                    style: ShelfType.mono.copyWith(color: p.textPrimary)),
+              ),
+              if (lowConfidence) ...[
+                ShelfChip(label: 'low confidence', color: p.caution),
+                const SizedBox(width: ShelfSpacing.sm),
+              ],
+              Text('match ${(candidate.score * 100).round()}%',
+                  style: ShelfType.caption.copyWith(color: p.textSecondary)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
