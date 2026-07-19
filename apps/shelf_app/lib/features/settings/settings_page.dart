@@ -13,7 +13,6 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = S.of(context);
-    final p = ShelfTokens.of(context);
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localeProvider);
 
@@ -32,9 +31,9 @@ class SettingsPage extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(s.appearanceSection,
-                          style: ShelfType.subtitle
-                              .copyWith(color: p.textPrimary)),
+                      _SectionHeader(
+                          icon: FluentIcons.color,
+                          title: s.appearanceSection),
                       const SizedBox(height: ShelfSpacing.md),
                       InfoLabel(
                         label: s.themeLabel,
@@ -64,9 +63,9 @@ class SettingsPage extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(s.languageSection,
-                          style: ShelfType.subtitle
-                              .copyWith(color: p.textPrimary)),
+                      _SectionHeader(
+                          icon: FluentIcons.locale_language,
+                          title: s.languageSection),
                       const SizedBox(height: ShelfSpacing.md),
                       InfoLabel(
                         label: s.languageLabel,
@@ -96,6 +95,35 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Icon tile + subtitle-weight title for a settings card.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ShelfTokens.of(context);
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: p.accent.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(ShelfSpacing.controlRadius),
+          ),
+          child: Icon(icon, size: 14, color: p.accent),
+        ),
+        const SizedBox(width: ShelfSpacing.md),
+        Text(title,
+            style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
+      ],
     );
   }
 }

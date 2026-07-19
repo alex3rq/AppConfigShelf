@@ -92,9 +92,9 @@ BEGIN
             VALUE "CompanyName", "dev.appconfigshelf" "\0"
             VALUE "FileDescription", "AppConfigShelf" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "shelf_app" "\0"
+            VALUE "InternalName", "AppConfigShelf" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 dev.appconfigshelf. All rights reserved." "\0"
-            VALUE "OriginalFilename", "shelf_app.exe" "\0"
+            VALUE "OriginalFilename", "AppConfigShelf.exe" "\0"
             VALUE "ProductName", "AppConfigShelf" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

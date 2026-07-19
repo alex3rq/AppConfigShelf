@@ -45,7 +45,7 @@ jobs:
           Set-Content "$stage/PORTABLE.txt" @"
           AppConfigShelf $version (portable)
 
-          Run shelf_app.exe. No installation required.
+          Run AppConfigShelf.exe. No installation required.
           Settings, logs, and your library live under
           %APPDATA%\AppConfigShelf and %LOCALAPPDATA%\AppConfigShelf.
 
