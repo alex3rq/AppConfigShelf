@@ -88,7 +88,7 @@ class BackupRunNotifier extends Notifier<BackupRunState> {
         plan: plan,
         outputPath: outputPath,
         io: io,
-        appVersion: '0.1.0',
+        appVersion: '0.2.0',
       )) {
         switch (event) {
           case EntryStarted(:final name):

@@ -1,7 +1,7 @@
 name: shelf_app
 description: "AppConfigShelf - backup and restore application configurations before reinstalling Windows."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 resolution: workspace
 
 environment:
@@ -34,7 +34,7 @@ msix_config:
   display_name: AppConfigShelf
   publisher_display_name: AppConfigShelf Project
   identity_name: dev.appconfigshelf.shelf
-  msix_version: 0.1.0.0
+  msix_version: 0.2.0.0
   logo_path: windows/runner/resources/app_icon.ico
   capabilities: ""
   store: false
