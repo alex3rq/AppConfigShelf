@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:fluent_ui/fluent_ui.dart' show ThemeMode;
+import 'package:fluent_ui/fluent_ui.dart' show Locale, ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart' show KnownFolder;
 import 'package:shelf_win32/shelf_win32.dart';
@@ -33,7 +33,28 @@ final class SettingsStore {
     }
   }
 
-  void saveThemeMode(ThemeMode mode) {
+  void saveThemeMode(ThemeMode mode) => _merge('themeMode', mode.name);
+
+  /// Saved language code ('en' | 'es') or null to follow Windows.
+  String? loadLocale() {
+    final file = File(_path);
+    if (!file.existsSync()) return null;
+    try {
+      final decoded = jsonDecode(file.readAsStringSync());
+      if (decoded is! Map) return null;
+      return switch (decoded['locale']) {
+        'en' => 'en',
+        'es' => 'es',
+        _ => null,
+      };
+    } on FormatException {
+      return null;
+    }
+  }
+
+  void saveLocale(String? code) => _merge('locale', code);
+
+  void _merge(String key, Object? value) {
     final file = File(_path);
     file.parent.createSync(recursive: true);
     Map<String, Object?> existing = {};
@@ -47,7 +68,11 @@ final class SettingsStore {
         // Corrupt settings file: rewrite from scratch.
       }
     }
-    existing['themeMode'] = mode.name;
+    if (value == null) {
+      existing.remove(key);
+    } else {
+      existing[key] = value;
+    }
     file.writeAsStringSync(
         const JsonEncoder.withIndent('  ').convert(existing));
   }
@@ -65,5 +90,22 @@ final class ThemeModeNotifier extends Notifier<ThemeMode> {
   void set(ThemeMode mode) {
     state = mode;
     ref.read(settingsStoreProvider).saveThemeMode(mode);
+  }
+}
+
+/// App locale override; null = follow the Windows display language.
+final localeProvider =
+    NotifierProvider<LocaleNotifier, Locale?>(LocaleNotifier.new);
+
+final class LocaleNotifier extends Notifier<Locale?> {
+  @override
+  Locale? build() {
+    final code = ref.read(settingsStoreProvider).loadLocale();
+    return code == null ? null : Locale(code);
+  }
+
+  void set(Locale? locale) {
+    state = locale;
+    ref.read(settingsStoreProvider).saveLocale(locale?.languageCode);
   }
 }

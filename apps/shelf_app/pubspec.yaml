@@ -12,7 +12,10 @@ dependencies:
   fluent_ui: ^4.9.0
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_riverpod: ^2.6.0
+  intl: ^0.20.0
   logging: ^1.2.0
   shelf_backup: ^0.1.0
   shelf_core: ^0.1.0
@@ -38,5 +41,6 @@ msix_config:
 
 flutter:
   uses-material-design: true
+  generate: true
   assets:
     - assets/db.json

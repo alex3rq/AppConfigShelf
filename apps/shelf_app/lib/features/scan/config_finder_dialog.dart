@@ -4,18 +4,20 @@ import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_detect/shelf_detect.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import '../../shared/widgets/risk_chip.dart';
 import '../../theme/shelf_theme.dart';
 import '../backup/add_custom_item.dart';
 import '../database/db_providers.dart';
 import '../database/entry_editor_dialog.dart';
+import 'scan_view_model.dart';
 
 enum _FinderOutcome { savedToLibrary, addedCustomItem }
 
 /// Shows heuristic config-folder candidates for an app the database doesn't
 /// know. Primary flow: save the app to "My library" as a real database
 /// entry (detection-gated, appears as Recognized on the next scan).
-/// Secondary: copy a YAML draft for contributing to the community db.
+/// Fallback when nothing is found: add any folder as a custom backup item.
 Future<void> showConfigFinderDialog(
     BuildContext context, WidgetRef ref, InstallEvidence evidence) async {
   final candidates = locateConfigCandidates(
@@ -32,23 +34,20 @@ Future<void> showConfigFinderDialog(
   );
   if (outcome == null || !context.mounted) return;
 
-  final name = evidence.displayName ?? 'Unknown app';
+  final name = evidence.displayName ?? S.of(context).unknownApp;
   await displayInfoBar(context, builder: (context, close) {
     return switch (outcome) {
       _FinderOutcome.savedToLibrary => InfoBar(
-          title: Text('"$name" saved to My library'),
-          content: const Text(
-              'It will appear under Recognized on the next scan, and can be '
-              'edited any time from the Database tab.'),
+          title: Text(S.of(context).savedToLibraryTitle(name)),
+          content: Text(S.of(context).savedToLibraryBody),
           severity: InfoBarSeverity.success,
           onClose: close,
         ),
-      _FinderOutcome.addedCustomItem => const InfoBar(
-          title: Text('Custom item added'),
-          content: Text(
-              'The folder is listed under Custom items on the Backup tab '
-              'and will be included in every backup.'),
+      _FinderOutcome.addedCustomItem => InfoBar(
+          title: Text(S.of(context).customItemAddedTitle),
+          content: Text(S.of(context).customItemAddedBody),
           severity: InfoBarSeverity.success,
+          onClose: close,
         ),
     };
   });
@@ -71,29 +70,25 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
       widget.candidates.first.path.stored,
   };
 
-  String get _appName => widget.evidence.displayName ?? 'Unknown app';
+  String get _appName =>
+      widget.evidence.displayName ?? S.of(context).unknownApp;
 
   @override
   Widget build(BuildContext context) {
     final p = ShelfTokens.of(context);
     return ContentDialog(
       constraints: const BoxConstraints(maxWidth: 560),
-      title: Text('Find configuration — $_appName'),
+      title: Text(S.of(context).findConfigTitle(_appName)),
       content: widget.candidates.isEmpty
           ? Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                    'No likely config folders found under AppData, '
-                    'LocalAppData, or Documents. The app may store settings '
-                    'in the registry or its install folder — you can still '
-                    'pick any folder yourself and back it up as a custom '
-                    'item.'),
+                Text(S.of(context).finderNoCandidates),
                 const SizedBox(height: ShelfSpacing.md),
                 Button(
                   onPressed: _addCustomItem,
-                  child: const Text('Add folder as custom item…'),
+                  child: Text(S.of(context).addFolderAsCustomItem),
                 ),
               ],
             )
@@ -101,9 +96,7 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                    'AppConfigShelf looked in the usual places. Check the '
-                    'folders that hold this app\'s settings.',
+                Text(S.of(context).finderSubtitle,
                     style:
                         ShelfType.caption.copyWith(color: p.textSecondary)),
                 const SizedBox(height: ShelfSpacing.md),
@@ -121,15 +114,13 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                          'Nothing here? Settings may live in the registry '
-                          'or the install folder.',
+                      child: Text(S.of(context).finderNothingHere,
                           style: ShelfType.caption
                               .copyWith(color: p.textSecondary)),
                     ),
                     HyperlinkButton(
                       onPressed: _addCustomItem,
-                      child: const Text('Add folder as custom item…'),
+                      child: Text(S.of(context).addFolderAsCustomItem),
                     ),
                   ],
                 ),
@@ -138,16 +129,16 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
       actions: [
         Button(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: Text(S.of(context).close),
         ),
         if (widget.candidates.isNotEmpty) ...[
           Button(
             onPressed: _selected.isEmpty ? null : _editBeforeSaving,
-            child: const Text('Edit before saving…'),
+            child: Text(S.of(context).editBeforeSaving),
           ),
           FilledButton(
             onPressed: _selected.isEmpty ? null : _saveToLibrary,
-            child: const Text('Save to my library'),
+            child: Text(S.of(context).saveToMyLibrary),
           ),
         ],
       ],
@@ -180,6 +171,9 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
 
   void _saveToLibrary() {
     ref.read(localEntriesProvider.notifier).save(_buildEntry());
+    // Background rescan so the new entry shows up as Recognized and in the
+    // Backup list without a manual "Scan system".
+    ref.read(scanProvider.notifier).scan();
     Navigator.pop(context, _FinderOutcome.savedToLibrary);
   }
 
@@ -187,6 +181,7 @@ class _ConfigFinderDialogState extends ConsumerState<_ConfigFinderDialog> {
     final edited = await showEntryEditorDialog(context, _buildEntry());
     if (edited == null || !mounted) return;
     ref.read(localEntriesProvider.notifier).save(edited);
+    ref.read(scanProvider.notifier).scan();
     Navigator.pop(context, _FinderOutcome.savedToLibrary);
   }
 
@@ -233,10 +228,14 @@ class _CandidateRow extends StatelessWidget {
                     style: ShelfType.mono.copyWith(color: p.textPrimary)),
               ),
               if (lowConfidence) ...[
-                ShelfChip(label: 'low confidence', color: p.caution),
+                ShelfChip(
+                    label: S.of(context).lowConfidence, color: p.caution),
                 const SizedBox(width: ShelfSpacing.sm),
               ],
-              Text('match ${(candidate.score * 100).round()}%',
+              Text(
+                  S
+                      .of(context)
+                      .matchPercent((candidate.score * 100).round()),
                   style: ShelfType.caption.copyWith(color: p.textSecondary)),
             ],
           ),

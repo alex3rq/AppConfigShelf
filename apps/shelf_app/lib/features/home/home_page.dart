@@ -3,6 +3,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_detect/shelf_detect.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import '../../shared/widgets/page_header.dart';
 import '../../shared/widgets/shelf_card.dart';
 import '../../shell_index.dart';
@@ -25,13 +26,15 @@ class HomePage extends ConsumerWidget {
       content: ListView(
         children: [
           ShelfPageHeader(
-            title: 'Home',
-            subtitle: 'Reinstall Windows. Not your workflow.',
+            title: S.of(context).navHome,
+            subtitle: S.of(context).homeSlogan,
             trailing: Button(
               onPressed: scan.isLoading
                   ? null
                   : () => ref.read(scanProvider.notifier).scan(),
-              child: Text(result == null ? 'Scan this PC' : 'Scan again'),
+              child: Text(result == null
+                  ? S.of(context).scanThisPc
+                  : S.of(context).scanAgain),
             ),
           ),
           Padding(
@@ -50,12 +53,9 @@ class HomePage extends ConsumerWidget {
                       child: _ActionCard(
                         tinted: true,
                         icon: FluentIcons.save,
-                        title: 'Back up this PC',
-                        body:
-                            'Pick the apps and folders that matter, get one '
-                            'portable .acshelf file you can carry through a '
-                            'reinstall.',
-                        buttonLabel: 'Start backup',
+                        title: S.of(context).backupCardTitle,
+                        body: S.of(context).backupCardBody,
+                        buttonLabel: S.of(context).startBackup,
                         filled: true,
                         onPressed: () => ref
                             .read(shellIndexProvider.notifier)
@@ -66,12 +66,9 @@ class HomePage extends ConsumerWidget {
                     Expanded(
                       child: _ActionCard(
                         icon: FluentIcons.history,
-                        title: 'Restore a backup',
-                        body:
-                            'Open an .acshelf file from this or another '
-                            'machine and bring everything back — all of it, '
-                            'or just the parts you choose.',
-                        buttonLabel: 'Open backup…',
+                        title: S.of(context).restoreCardTitle,
+                        body: S.of(context).restoreCardBody,
+                        buttonLabel: S.of(context).openBackupAction,
                         onPressed: () => _openBackupFile(ref),
                       ),
                     ),
@@ -142,9 +139,8 @@ class _StatRow extends ConsumerWidget {
             Expanded(
               child: Text(
                 loading
-                    ? 'Scanning this PC…'
-                    : 'Scan this PC to see which of your installed apps '
-                        'AppConfigShelf can back up.',
+                    ? S.of(context).homeScanning
+                    : S.of(context).homeScanPrompt,
                 style: ShelfType.body.copyWith(color: p.textSecondary),
               ),
             ),
@@ -158,14 +154,15 @@ class _StatRow extends ConsumerWidget {
         child: Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        stat('${r.detected.length + r.unknown.length}', 'apps found on this PC',
-            'View applications', ShellTab.applications),
+        stat('${r.detected.length + r.unknown.length}',
+            S.of(context).statAppsFound, S.of(context).viewApplications,
+            ShellTab.applications),
         const SizedBox(width: ShelfSpacing.lg),
-        stat('${r.detected.length}', 'recognized by the database',
-            'Ready to back up', ShellTab.backup),
+        stat('${r.detected.length}', S.of(context).statRecognized,
+            S.of(context).readyToBackUp, ShellTab.backup),
         const SizedBox(width: ShelfSpacing.lg),
-        stat('${r.unknown.length}', 'unknown apps worth a look', 'Review',
-            ShellTab.applications,
+        stat('${r.unknown.length}', S.of(context).statUnknown,
+            S.of(context).review, ShellTab.applications,
             valueColor: p.caution),
       ],
     ));
@@ -254,13 +251,12 @@ class _SafetyTimeline extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Safety timeline',
+                      Text(S.of(context).timelineTitle,
                           style: ShelfType.subtitle
                               .copyWith(color: p.textPrimary)),
                       const SizedBox(height: ShelfSpacing.xs),
                       Text(
-                        'Every backup and undo bundle this PC has produced '
-                        '— open any of them like a backup.',
+                        S.of(context).timelineSubtitle,
                         style: ShelfType.caption
                             .copyWith(color: p.textSecondary),
                       ),
@@ -269,7 +265,7 @@ class _SafetyTimeline extends ConsumerWidget {
                 ),
                 HyperlinkButton(
                   onPressed: () => _openBackupFile(ref),
-                  child: const Text('Open a file…'),
+                  child: Text(S.of(context).openAFile),
                 ),
               ],
             ),
@@ -278,7 +274,7 @@ class _SafetyTimeline extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(
                   ShelfSpacing.lg, 0, ShelfSpacing.lg, ShelfSpacing.lg),
-              child: Text('Nothing yet — your first backup will show here.',
+              child: Text(S.of(context).timelineEmpty,
                   style: ShelfType.caption.copyWith(color: p.textSecondary)),
             ),
           for (final event in history.take(8)) _TimelineRow(event: event),
@@ -297,8 +293,8 @@ class _TimelineRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final p = ShelfTokens.of(context);
     final title = switch (event.kind) {
-      HistoryKind.backup => 'Backup created',
-      HistoryKind.undoBundle => 'Undo bundle kept',
+      HistoryKind.backup => S.of(context).timelineBackupCreated,
+      HistoryKind.undoBundle => S.of(context).timelineUndoKept,
     };
     final fileName = event.path.split(RegExp(r'[\\/]')).last;
     return Container(
@@ -328,7 +324,7 @@ class _TimelineRow extends ConsumerWidget {
               ],
             ),
           ),
-          Text(_relative(event.timestamp),
+          Text(_relative(context, event.timestamp),
               style: ShelfType.caption.copyWith(color: p.textSecondary)),
           const SizedBox(width: ShelfSpacing.md),
           HyperlinkButton(
@@ -338,19 +334,20 @@ class _TimelineRow extends ConsumerWidget {
                   .read(restoreProvider.notifier)
                   .openPackage(event.path);
             },
-            child: Text(
-                event.kind == HistoryKind.backup ? 'Open' : 'Roll back'),
+            child: Text(event.kind == HistoryKind.backup
+                ? S.of(context).open
+                : S.of(context).rollBack),
           ),
         ],
       ),
     );
   }
 
-  String _relative(DateTime t) {
+  String _relative(BuildContext context, DateTime t) {
     final diff = DateTime.now().difference(t);
-    if (diff.inDays < 1) return 'today';
-    if (diff.inDays == 1) return 'yesterday';
-    if (diff.inDays < 8) return '${diff.inDays} days ago';
+    if (diff.inDays < 1) return S.of(context).relativeToday;
+    if (diff.inDays == 1) return S.of(context).relativeYesterday;
+    if (diff.inDays < 8) return S.of(context).relativeDaysAgo(diff.inDays);
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',

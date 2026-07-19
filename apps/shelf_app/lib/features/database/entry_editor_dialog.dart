@@ -4,6 +4,7 @@ import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_rules/shelf_rules.dart';
 import 'package:shelf_win32/shelf_win32.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import '../../theme/shelf_theme.dart';
 
 /// Editable form for a database entry (official or local). Validation runs
@@ -85,11 +86,9 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Edit entry — ${widget.entry.name}'),
+          Text(S.of(context).editEntryTitle(widget.entry.name)),
           const SizedBox(height: ShelfSpacing.xs),
-          Text(
-              'Saved to My library only — the official database entry is '
-              'never modified.',
+          Text(S.of(context).editorSubtitle,
               style: ShelfType.caption.copyWith(color: p.textSecondary)),
         ],
       ),
@@ -99,12 +98,12 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             InfoLabel(
-              label: 'Display name',
+              label: S.of(context).displayName,
               child: TextBox(controller: _name),
             ),
             const SizedBox(height: ShelfSpacing.sm),
             InfoLabel(
-              label: 'Detect path',
+              label: S.of(context).detectPath,
               child: Row(children: [
                 Expanded(
                   child: TextBox(
@@ -115,14 +114,14 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
                 const SizedBox(width: ShelfSpacing.sm),
                 Button(
                     onPressed: _browseDetectPath,
-                    child: const Text('Browse…')),
+                    child: Text(S.of(context).browse)),
               ]),
             ),
             const SizedBox(height: ShelfSpacing.xs),
-            Text('The entry is used only when this file exists on the PC.',
+            Text(S.of(context).detectPathNote,
                 style: ShelfType.caption.copyWith(color: p.textSecondary)),
             const SizedBox(height: ShelfSpacing.md),
-            Text('Backup locations',
+            Text(S.of(context).backupLocations,
                 style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
             for (var i = 0; i < _rules.length; i++) ...[
               const SizedBox(height: ShelfSpacing.sm),
@@ -139,12 +138,12 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
             const SizedBox(height: ShelfSpacing.sm),
             HyperlinkButton(
               onPressed: _addRuleFromPicker,
-              child: const Text('+ Add backup location…'),
+              child: Text(S.of(context).addBackupLocation),
             ),
             if (_error != null) ...[
               const SizedBox(height: ShelfSpacing.sm),
               InfoBar(
-                title: const Text('Cannot save'),
+                title: Text(S.of(context).cannotSave),
                 content: Text(_error!),
                 severity: InfoBarSeverity.error,
               ),
@@ -155,17 +154,16 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
       actions: [
         Button(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(S.of(context).cancel),
         ),
         if (errorCount > 0)
           Center(
-            child: Text(
-                '$errorCount ${errorCount == 1 ? 'issue' : 'issues'} to fix',
+            child: Text(S.of(context).issuesToFix(errorCount),
                 style: ShelfType.caption.copyWith(color: p.danger)),
           ),
         FilledButton(
           onPressed: _save,
-          child: const Text('Save to my library'),
+          child: Text(S.of(context).saveToMyLibrary),
         ),
       ],
     );
@@ -177,9 +175,8 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
     // Db entries store tokenized paths only.
     final tokenized = _tokenize(file.path);
     if (tokenized == null) {
-      setState(() => _error =
-          'That file is outside the supported locations (AppData, '
-          'LocalAppData, ProgramData, user profile, Documents).');
+      setState(
+          () => _error = S.of(context).outsideSupportedFile);
       return;
     }
     setState(() {
@@ -207,10 +204,8 @@ class _EntryEditorDialogState extends State<_EntryEditorDialog> {
     // db entries cannot carry absolute paths.
     final tokenized = _tokenize(dir);
     if (tokenized == null) {
-      setState(() => _error =
-          'That folder is outside the supported locations (AppData, '
-          'LocalAppData, ProgramData, user profile, Documents). Use a '
-          'custom item on the Backup tab for arbitrary folders.');
+      setState(
+          () => _error = S.of(context).outsideSupportedFolder);
       return;
     }
     setState(() {
@@ -297,7 +292,7 @@ class _RuleCard extends StatelessWidget {
           Row(children: [
             Expanded(
               child: InfoLabel(
-                label: 'Folder',
+                label: S.of(context).folder,
                 child: TextBox(
                   controller: fields.path,
                   placeholder: r'%APPDATA%\MyApp',
@@ -319,7 +314,7 @@ class _RuleCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     InfoLabel(
-                      label: 'Include patterns',
+                      label: S.of(context).includePatterns,
                       child: TextBox(
                           controller: fields.include,
                           maxLines: 2,
@@ -327,9 +322,7 @@ class _RuleCard extends StatelessWidget {
                           placeholder: '**/*.json, snippets/**'),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                        'Patterns like **/*.json — leave empty to include '
-                        'everything',
+                    Text(S.of(context).includeHelp,
                         style: ShelfType.caption
                             .copyWith(color: p.textSecondary)),
                   ],
@@ -341,7 +334,7 @@ class _RuleCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     InfoLabel(
-                      label: 'Exclude patterns',
+                      label: S.of(context).excludePatterns,
                       child: TextBox(
                           controller: fields.exclude,
                           maxLines: 2,
@@ -349,7 +342,7 @@ class _RuleCard extends StatelessWidget {
                           placeholder: 'Cache/**'),
                     ),
                     const SizedBox(height: 2),
-                    Text('Skipped even when matched by Include',
+                    Text(S.of(context).excludeHelp,
                         style: ShelfType.caption
                             .copyWith(color: p.textSecondary)),
                   ],
@@ -361,8 +354,7 @@ class _RuleCard extends StatelessWidget {
           ToggleSwitch(
             checked: fields.optional,
             onChanged: onOptionalChanged,
-            content: const Text(
-                'Optional — skip silently when this folder is missing'),
+            content: Text(S.of(context).optionalToggle),
           ),
         ],
       ),

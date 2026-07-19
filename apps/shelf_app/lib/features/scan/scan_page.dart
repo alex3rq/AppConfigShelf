@@ -2,6 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_detect/shelf_detect.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import '../../shared/widgets/origin_chip.dart';
 import '../../shared/widgets/page_header.dart';
 import '../../shared/widgets/risk_chip.dart';
@@ -32,14 +33,13 @@ class ScanPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ShelfPageHeader(
-            title: 'Applications',
-            subtitle:
-                'Everything the scan found, and what the database knows about it.',
+            title: S.of(context).navApplications,
+            subtitle: S.of(context).appsSubtitle,
             trailing: FilledButton(
               onPressed: scan.isLoading
                   ? null
                   : () => ref.read(scanProvider.notifier).scan(),
-              child: const Text('Scan system'),
+              child: Text(S.of(context).scanSystem),
             ),
           ),
           Expanded(
@@ -47,7 +47,7 @@ class ScanPage extends ConsumerWidget {
               AsyncData(value: null) => const _EmptyState(),
               AsyncData(:final value?) => _ResultList(result: value),
               AsyncError(:final error) =>
-                Center(child: Text('Scan failed: $error')),
+                Center(child: Text(S.of(context).scanFailed('$error'))),
               _ => const Center(child: ProgressRing()),
             },
           ),
@@ -64,7 +64,7 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = ShelfTokens.of(context);
     return Center(
-      child: Text('Run a scan to detect installed applications.',
+      child: Text(S.of(context).runScanPrompt,
           style: ShelfType.body.copyWith(color: p.textSecondary)),
     );
   }
@@ -115,20 +115,22 @@ class _ResultList extends ConsumerWidget {
         Wrap(
           spacing: ShelfSpacing.sm,
           children: [
-            ShelfChip(label: '$found found'),
+            ShelfChip(label: S.of(context).chipFound(found)),
             ShelfChip(
-                label: '${result.detected.length} recognized',
+                label: S.of(context).chipRecognized(result.detected.length),
                 color: p.success),
             ShelfChip(
-                label: '${visible.length} not in database', color: p.caution),
-            ShelfChip(label: '$hiddenCount hidden'),
+                label: S.of(context).chipNotInDb(visible.length),
+                color: p.caution),
+            ShelfChip(label: S.of(context).chipHidden(hiddenCount)),
           ],
         ),
         const SizedBox(height: ShelfSpacing.lg),
         Row(
           children: [
             Expanded(
-              child: Text('Recognized (${result.detected.length})',
+              child: Text(
+                  S.of(context).recognizedSection(result.detected.length),
                   style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
             ),
             HyperlinkButton(
@@ -140,7 +142,7 @@ class _ResultList extends ConsumerWidget {
                 };
                 ref.read(shellIndexProvider.notifier).state = ShellTab.backup;
               },
-              child: const Text('Add all to backup'),
+              child: Text(S.of(context).addAllToBackup),
             ),
           ],
         ),
@@ -162,7 +164,10 @@ class _ResultList extends ConsumerWidget {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('match ${(app.confidence * 100).round()}%',
+                      Text(
+                          S
+                              .of(context)
+                              .matchPercent((app.confidence * 100).round()),
                           style: ShelfType.caption
                               .copyWith(color: p.textSecondary)),
                       const SizedBox(width: ShelfSpacing.md),
@@ -179,7 +184,7 @@ class _ResultList extends ConsumerWidget {
                                 ref.read(shellIndexProvider.notifier).state =
                                     ShellTab.backup;
                               },
-                        child: const Text('Add to backup'),
+                        child: Text(S.of(context).addToBackup),
                       ),
                     ],
                   ),
@@ -191,10 +196,10 @@ class _ResultList extends ConsumerWidget {
         Row(
           children: [
             Expanded(
-              child: Text('Not in database yet (${visible.length})',
+              child: Text(S.of(context).notInDbSection(visible.length),
                   style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
             ),
-            Text('Teach AppConfigShelf where these keep their settings',
+            Text(S.of(context).teachPrompt,
                 style: ShelfType.caption.copyWith(color: p.textSecondary)),
           ],
         ),
@@ -206,7 +211,7 @@ class _ResultList extends ConsumerWidget {
               for (final (i, evidence) in visible.indexed)
                 _AppRow(
                   first: i == 0,
-                  name: evidence.displayName ?? '(unnamed)',
+                  name: evidence.displayName ?? S.of(context).unnamed,
                   detail: [
                     if (evidence.publisher != null) evidence.publisher!,
                     if (evidence.version != null) evidence.version!,
@@ -217,7 +222,7 @@ class _ResultList extends ConsumerWidget {
                       Button(
                         onPressed: () =>
                             showConfigFinderDialog(context, ref, evidence),
-                        child: const Text('Find config…'),
+                        child: Text(S.of(context).findConfig),
                       ),
                       const SizedBox(width: ShelfSpacing.sm),
                       HyperlinkButton(
@@ -226,7 +231,7 @@ class _ResultList extends ConsumerWidget {
                             : () => ref
                                 .read(ignoredNamesProvider.notifier)
                                 .hide(evidence.displayName!),
-                        child: const Text('Hide'),
+                        child: Text(S.of(context).hide),
                       ),
                     ],
                   ),
@@ -241,14 +246,13 @@ class _ResultList extends ConsumerWidget {
             child: Expander(
               header: Row(
                 children: [
-                  Text('Hidden ($hiddenCount)',
+                  Text(S.of(context).hiddenSection(hiddenCount),
                       style:
                           ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
                   const SizedBox(width: ShelfSpacing.md),
                   Text(
-                    '${userHidden.length} hidden by you · '
-                    '${officialIgnored.length} system components ignored by '
-                    'database rules',
+                    S.of(context).hiddenSummary(
+                        userHidden.length, officialIgnored.length),
                     style:
                         ShelfType.caption.copyWith(color: p.textSecondary),
                   ),
@@ -259,20 +263,19 @@ class _ResultList extends ConsumerWidget {
                 children: [
                   for (final evidence in userHidden)
                     _AppRow(
-                      name: evidence.displayName ?? '(unnamed)',
-                      detail: 'hidden by you',
+                      name: evidence.displayName ?? S.of(context).unnamed,
+                      detail: S.of(context).hiddenByYou,
                       trailing: HyperlinkButton(
                         onPressed: () => ref
                             .read(ignoredNamesProvider.notifier)
                             .unhide(evidence.displayName!),
-                        child: const Text('Unhide'),
+                        child: Text(S.of(context).unhide),
                       ),
                     ),
                   for (final evidence in officialIgnored)
                     _AppRow(
-                      name: evidence.displayName ?? '(unnamed)',
-                      detail:
-                          'system component — matched a database ignore rule',
+                      name: evidence.displayName ?? S.of(context).unnamed,
+                      detail: S.of(context).systemComponentIgnored,
                     ),
                 ],
               ),

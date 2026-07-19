@@ -5,6 +5,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import '../../shared/format.dart';
 import '../../shared/widgets/footer_action_bar.dart';
 import '../../shared/widgets/page_header.dart';
@@ -64,12 +65,16 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ShelfPageHeader(
-            title: 'Back up',
+            title: S.of(context).backupTitle,
             subtitle: run is BackupRunning
-                ? 'Writing your backup — you can keep using this PC.'
-                : 'Choose what travels with you. Nothing is written until you confirm.',
+                ? S.of(context).backupSubtitleRunning
+                : S.of(context).backupSubtitle,
             trailing: WizardSteps(
-              labels: const ['Select', 'Back up', 'Done'],
+              labels: [
+                S.of(context).stepSelect,
+                S.of(context).stepBackUp,
+                S.of(context).stepDone,
+              ],
               current: step,
             ),
           ),
@@ -104,6 +109,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   Widget _buildSelection(
       List<AppEntry> detectedEntries, List<CustomItem> customItems) {
     final p = ShelfTokens.of(context);
+    final scan = ref.watch(scanProvider);
     final filtered = [
       for (final e in detectedEntries)
         if (_filter.isEmpty ||
@@ -131,8 +137,8 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                         }
                       }),
               content: Text(
-                'Detected applications — ${_selectedApps.length} of '
-                '${detectedEntries.length} selected',
+                S.of(context).detectedAppsSelected(
+                    _selectedApps.length, detectedEntries.length),
                 style: ShelfType.bodyStrong.copyWith(color: p.textPrimary),
               ),
             ),
@@ -140,7 +146,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
             SizedBox(
               width: 200,
               child: TextBox(
-                placeholder: 'Filter apps',
+                placeholder: S.of(context).filterApps,
                 onChanged: (v) => setState(() => _filter = v),
               ),
             ),
@@ -149,8 +155,37 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         const SizedBox(height: ShelfSpacing.sm),
         if (detectedEntries.isEmpty)
           ShelfCard(
-            child: Text('Run a scan first (Applications tab).',
-                style: ShelfType.body.copyWith(color: p.textSecondary)),
+            padding: const EdgeInsets.all(ShelfSpacing.xl),
+            child: scan.isLoading
+                ? Column(
+                    children: [
+                      const ProgressRing(),
+                      const SizedBox(height: ShelfSpacing.md),
+                      Text(S.of(context).homeScanning),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Icon(FluentIcons.search, size: 24, color: p.textSecondary),
+                      const SizedBox(height: ShelfSpacing.md),
+                      Text(S.of(context).backupScanCtaTitle,
+                          style: ShelfType.subtitle
+                              .copyWith(color: p.textPrimary)),
+                      const SizedBox(height: ShelfSpacing.xs),
+                      Text(S.of(context).backupScanCtaBody,
+                          style: ShelfType.caption
+                              .copyWith(color: p.textSecondary)),
+                      const SizedBox(height: ShelfSpacing.md),
+                      FilledButton(
+                        onPressed: () {
+                          ref.read(scanProvider.notifier).scan();
+                          ref.read(shellIndexProvider.notifier).state =
+                              ShellTab.applications;
+                        },
+                        child: Text(S.of(context).scanApplications),
+                      ),
+                    ],
+                  ),
           )
         else
           ShelfCard(
@@ -174,22 +209,19 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         Row(
           children: [
             Expanded(
-              child: Text('Custom items — restored to their original paths',
+              child: Text(S.of(context).customItemsSection,
                   style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
             ),
             Button(
               onPressed: () => addCustomItemFlow(context, ref),
-              child: const Text('Add folder…'),
+              child: Text(S.of(context).addFolderAction),
             ),
           ],
         ),
         const SizedBox(height: ShelfSpacing.sm),
         if (customItems.isEmpty)
           ShelfCard(
-            child: Text(
-                'Add any folder or file to back up, even if no app is '
-                'detected. Custom items are always restored to their '
-                'original location.',
+            child: Text(S.of(context).customItemsEmpty,
                 style: ShelfType.caption.copyWith(color: p.textSecondary)),
           )
         else
@@ -208,7 +240,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
                       onPressed: () => ref
                           .read(customItemsProvider.notifier)
                           .remove(item.slug),
-                      child: const Text('Remove'),
+                      child: Text(S.of(context).remove),
                     ),
                   ),
               ],
@@ -321,23 +353,23 @@ class _SelectionFooter extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${selectedApps.length} apps · ${customItems.length} custom items',
+            S.of(context).footerSummary(
+                selectedApps.length, customItems.length),
             style: ShelfType.bodyStrong.copyWith(color: p.textPrimary),
           ),
           if (cautionCount > 0)
             Text(
-              '$cautionCount caution/expert ${cautionCount == 1 ? 'item' : 'items'} selected — review before restoring on another PC',
+              S.of(context).cautionSelected(cautionCount),
               style: ShelfType.caption.copyWith(color: p.caution),
             ),
         ],
       ),
-      note: const Text(
-          'Writes one .acshelf file · nothing on this PC is changed'),
+      note: Text(S.of(context).footerNote),
       action: FilledButton(
         onPressed: selectedApps.isEmpty && customItems.isEmpty
             ? null
             : onStart,
-        child: const Text('Back up selection'),
+        child: Text(S.of(context).backUpSelection),
       ),
     );
   }
@@ -363,10 +395,11 @@ class _Progress extends StatelessWidget {
             children: [
               const ProgressRing(),
               const SizedBox(height: ShelfSpacing.lg),
-              Text('Backing up ${run.currentEntry}…',
+              Text(S.of(context).backingUpEntry(run.currentEntry),
                   style: ShelfType.subtitle.copyWith(color: p.textPrimary)),
               const SizedBox(height: ShelfSpacing.sm),
-              Text('${run.filesDone} of ${run.filesTotal} files',
+              Text(
+                  S.of(context).filesProgress(run.filesDone, run.filesTotal),
                   style: ShelfType.caption.copyWith(color: p.textSecondary)),
               const SizedBox(height: ShelfSpacing.md),
               ProgressBar(
@@ -379,9 +412,7 @@ class _Progress extends StatelessWidget {
                     style: ShelfType.mono.copyWith(color: p.textSecondary)),
               ],
               const SizedBox(height: ShelfSpacing.sm),
-              Text(
-                  'Files locked by running apps are skipped safely and '
-                  'listed in the report.',
+              Text(S.of(context).lockedFilesNote,
                   style: ShelfType.caption.copyWith(color: p.textSecondary)),
             ],
           ),
@@ -404,10 +435,10 @@ class _Failed extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Backup failed: $error',
+          Text(S.of(context).backupFailed('$error'),
               style: ShelfType.body.copyWith(color: p.danger)),
           const SizedBox(height: ShelfSpacing.sm),
-          Button(onPressed: onBack, child: const Text('Back')),
+          Button(onPressed: onBack, child: Text(S.of(context).back)),
         ],
       ),
     );
@@ -449,14 +480,14 @@ class _Report extends ConsumerWidget {
         ),
         const SizedBox(height: ShelfSpacing.md),
         Center(
-          child: Text('Backup complete',
+          child: Text(S.of(context).backupComplete,
               style: ShelfType.title.copyWith(color: p.textPrimary)),
         ),
         const SizedBox(height: ShelfSpacing.xs),
         Center(
           child: Text(
-              '${entries.length} entries · $totalFiles files · '
-              '${formatBytes(totalBytes)}',
+              S.of(context).reportTotals(
+                  entries.length, totalFiles, formatBytes(totalBytes)),
               style: ShelfType.caption.copyWith(color: p.textSecondary)),
         ),
         const SizedBox(height: ShelfSpacing.lg),
@@ -472,7 +503,7 @@ class _Report extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Saved to',
+                          Text(S.of(context).savedTo,
                               style: ShelfType.caption
                                   .copyWith(color: p.textSecondary)),
                           const SizedBox(height: 2),
@@ -484,7 +515,7 @@ class _Report extends ConsumerWidget {
                     ),
                     Button(
                       onPressed: () => _openFolder(run.outputPath),
-                      child: const Text('Open folder'),
+                      child: Text(S.of(context).openFolder),
                     ),
                   ],
                 ),
@@ -501,14 +532,16 @@ class _Report extends ConsumerWidget {
                       Expanded(
                         child: Text(
                             entry.source == EntrySource.custom
-                                ? '${entry.name} (custom)'
+                                ? S.of(context).customSuffix(entry.name)
                                 : entry.name,
                             style: ShelfType.bodyStrong
                                 .copyWith(color: p.textPrimary)),
                       ),
                       Text(
-                          '${entry.files.length} files · '
-                          '${formatBytes(entry.files.fold(0, (s, f) => s + f.size))}',
+                          S.of(context).filesAndSize(
+                              entry.files.length,
+                              formatBytes(entry.files
+                                  .fold(0, (s, f) => s + f.size))),
                           style: ShelfType.caption
                               .copyWith(color: p.textSecondary)),
                     ],
@@ -523,8 +556,7 @@ class _Report extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                    '${skipped.length} ${skipped.length == 1 ? 'file' : 'files'} skipped',
+                Text(S.of(context).skippedFiles(skipped.length),
                     style: ShelfType.bodyStrong.copyWith(color: p.caution)),
                 const SizedBox(height: ShelfSpacing.sm),
                 for (final skip in skipped)
@@ -541,14 +573,15 @@ class _Report extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FilledButton(onPressed: onBack, child: const Text('New backup')),
+            FilledButton(
+                onPressed: onBack, child: Text(S.of(context).newBackup)),
             const SizedBox(width: ShelfSpacing.sm),
             Button(
               onPressed: () {
                 onBack();
                 ref.read(shellIndexProvider.notifier).state = ShellTab.home;
               },
-              child: const Text('Go home'),
+              child: Text(S.of(context).goHome),
             ),
           ],
         ),

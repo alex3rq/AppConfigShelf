@@ -11,4 +11,8 @@ abstract final class ShellTab {
   static const backup = 2;
   static const restore = 3;
   static const library = 4;
+
+  /// Footer items count into the pane's selection index: the db-status
+  /// PaneItemAction is 5, Settings is 6.
+  static const settings = 6;
 }

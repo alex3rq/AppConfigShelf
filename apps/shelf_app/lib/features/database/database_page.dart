@@ -6,11 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart';
 import 'package:shelf_db/shelf_db.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import '../../shared/widgets/origin_chip.dart';
 import '../../shared/widgets/page_header.dart';
 import '../../shared/widgets/risk_chip.dart';
 import '../../shared/widgets/shelf_card.dart';
 import '../../theme/shelf_theme.dart';
+import '../scan/scan_view_model.dart';
 import 'db_providers.dart';
 import 'entry_draft.dart';
 import 'entry_editor_dialog.dart';
@@ -39,10 +41,8 @@ class DatabasePage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ShelfPageHeader(
-            title: 'Library',
-            subtitle:
-                'The official app database, plus your own entries. Yours '
-                'always win when they overlap.',
+            title: S.of(context).navLibrary,
+            subtitle: S.of(context).librarySubtitle,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -54,7 +54,7 @@ class DatabasePage extends ConsumerWidget {
                   ),
                 Button(
                   onPressed: checking ? null : () => _check(ref),
-                  child: const Text('Check for updates'),
+                  child: Text(S.of(context).checkForUpdates),
                 ),
               ],
             ),
@@ -69,13 +69,13 @@ class DatabasePage extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(
                   ShelfSpacing.xl, 0, ShelfSpacing.xl, ShelfSpacing.sm),
-              child: _outcomeBar(updateState),
+              child: _outcomeBar(context, updateState),
             ),
           Expanded(
             child: switch (bundle) {
               AsyncData() => const _MasterDetail(),
               AsyncError(:final error) =>
-                Center(child: Text('Failed to load database: $error')),
+                Center(child: Text(S.of(context).dbLoadFailed('$error'))),
               _ => const Center(child: ProgressRing()),
             },
           ),
@@ -84,19 +84,20 @@ class DatabasePage extends ConsumerWidget {
     );
   }
 
-  Widget _outcomeBar(UpdateOutcome outcome) => switch (outcome) {
+  Widget _outcomeBar(BuildContext context, UpdateOutcome outcome) =>
+      switch (outcome) {
         UpToDate(:final currentVersion) => InfoBar(
-            title: const Text('Up to date'),
-            content: Text('Version $currentVersion is current.'),
+            title: Text(S.of(context).upToDateTitle),
+            content: Text(S.of(context).upToDateBody(currentVersion)),
             severity: InfoBarSeverity.success,
           ),
         Updated(:final newVersion) => InfoBar(
-            title: const Text('Database updated'),
-            content: Text('Now using version $newVersion.'),
+            title: Text(S.of(context).dbUpdatedTitle),
+            content: Text(S.of(context).dbUpdatedBody(newVersion)),
             severity: InfoBarSeverity.success,
           ),
         UpdateFailed(:final failure) => InfoBar(
-            title: const Text('Update check failed'),
+            title: Text(S.of(context).updateFailedTitle),
             content: Text(failure.message),
             severity: InfoBarSeverity.warning,
           ),
@@ -139,7 +140,7 @@ class _VersionBadge extends StatelessWidget {
               BoxDecoration(color: p.success, shape: BoxShape.circle),
         ),
         const SizedBox(width: ShelfSpacing.sm),
-        Text('v${bundle.contentVersion} · signed',
+        Text(S.of(context).versionSigned(bundle.contentVersion),
             style: ShelfType.caption.copyWith(color: p.textSecondary)),
       ],
     );
@@ -201,7 +202,7 @@ class _MasterDetail extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextBox(
-                  placeholder: 'Search ${all.length} entries',
+                  placeholder: S.of(context).searchEntries(all.length),
                   onChanged: (v) =>
                       ref.read(_searchProvider.notifier).state = v,
                 ),
@@ -210,11 +211,16 @@ class _MasterDetail extends ConsumerWidget {
                   spacing: ShelfSpacing.xs,
                   children: [
                     for (final (f, label) in [
-                      (_Filter.all, 'All ${all.length}'),
-                      (_Filter.mine, 'My library ${local.entries.length}'),
+                      (_Filter.all, S.of(context).filterAll(all.length)),
+                      (
+                        _Filter.mine,
+                        S.of(context).filterMine(local.entries.length)
+                      ),
                       (
                         _Filter.official,
-                        'Official ${bundle?.entries.length ?? 0}'
+                        S
+                            .of(context)
+                            .filterOfficial(bundle?.entries.length ?? 0)
                       ),
                     ])
                       ToggleButton(
@@ -228,7 +234,7 @@ class _MasterDetail extends ConsumerWidget {
                 const SizedBox(height: ShelfSpacing.sm),
                 for (final warning in local.warnings)
                   InfoBar(
-                    title: const Text('Skipped invalid entry file'),
+                    title: Text(S.of(context).skippedInvalidEntry),
                     content: Text(warning),
                     severity: InfoBarSeverity.warning,
                   ),
@@ -257,7 +263,7 @@ class _MasterDetail extends ConsumerWidget {
           Expanded(
             child: selected == null
                 ? Center(
-                    child: Text('No entries match.',
+                    child: Text(S.of(context).noEntriesMatch,
                         style: ShelfType.body
                             .copyWith(color: p.textSecondary)))
                 : _EntryDetail(
@@ -368,43 +374,39 @@ class _EntryDetail extends ConsumerWidget {
             if (isMine) ...[
               Button(
                 onPressed: () => _exportYaml(context, entry),
-                child: const Text('Export YAML…'),
+                child: Text(S.of(context).exportYaml),
               ),
               const SizedBox(width: ShelfSpacing.sm),
               Button(
                 onPressed: () =>
                     ref.read(localEntriesProvider.notifier).delete(entry.id),
                 child: Text(origin == ChipOrigin.customized
-                    ? 'Reset to official'
-                    : 'Delete entry'),
+                    ? S.of(context).resetToOfficial
+                    : S.of(context).deleteEntry),
               ),
             ],
             const SizedBox(width: ShelfSpacing.sm),
             FilledButton(
               onPressed: () => _edit(context, ref, entry),
-              child: const Text('Edit entry'),
+              child: Text(S.of(context).editEntry),
             ),
           ],
         ),
         const SizedBox(height: ShelfSpacing.md),
         if (origin == ChipOrigin.customized)
           InfoBar(
-            title: const Text('Your customized copy.'),
-            content: const Text(
-                'Scanning and backups use this instead of the official '
-                'entry.'),
+            title: Text(S.of(context).customizedBannerTitle),
+            content: Text(S.of(context).customizedBannerBody),
             severity: InfoBarSeverity.info,
           )
         else if (origin == ChipOrigin.local)
           InfoBar(
-            title: const Text('Local entry.'),
-            content: const Text(
-                'Created on this PC — copy a YAML draft to contribute it to '
-                'the official database.'),
+            title: Text(S.of(context).localBannerTitle),
+            content: Text(S.of(context).localBannerBody),
             severity: InfoBarSeverity.info,
           ),
         const SizedBox(height: ShelfSpacing.lg),
-        Text('Detection',
+        Text(S.of(context).detectionSection,
             style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
         const SizedBox(height: ShelfSpacing.sm),
         ShelfCard(
@@ -414,18 +416,19 @@ class _EntryDetail extends ConsumerWidget {
               for (final rule in entry.detect)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(_describeDetection(rule),
+                  child: Text(_describeDetection(context, rule),
                       style:
                           ShelfType.mono.copyWith(color: p.textPrimary)),
                 ),
-              Text('Entry is active only when detection matches',
+              Text(S.of(context).detectionActiveNote,
                   style:
                       ShelfType.caption.copyWith(color: p.textSecondary)),
             ],
           ),
         ),
         const SizedBox(height: ShelfSpacing.lg),
-        Text('Backup locations (${entry.backup.length})',
+        Text(
+            S.of(context).backupLocationsSection(entry.backup.length),
             style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
         const SizedBox(height: ShelfSpacing.sm),
         for (final rule in entry.backup) ...[
@@ -441,22 +444,23 @@ class _EntryDetail extends ConsumerWidget {
                               .copyWith(color: p.textPrimary)),
                     ),
                     if (rule.optional)
-                      const ShelfChip(label: 'optional'),
+                      ShelfChip(label: S.of(context).chipOptional),
                     if (rule.sizeWarning)
-                      ShelfChip(label: 'large', color: p.caution),
+                      ShelfChip(
+                          label: S.of(context).chipLarge, color: p.caution),
                   ],
                 ),
                 if (rule.include.isNotEmpty) ...[
                   const SizedBox(height: ShelfSpacing.xs),
                   _RuleLine(
-                      label: 'Include',
+                      label: S.of(context).includeLabel,
                       color: p.success,
                       globs: rule.include),
                 ],
                 if (rule.exclude.isNotEmpty) ...[
                   const SizedBox(height: ShelfSpacing.xs),
                   _RuleLine(
-                      label: 'Exclude',
+                      label: S.of(context).excludeLabel,
                       color: p.danger,
                       globs: rule.exclude),
                 ],
@@ -469,11 +473,13 @@ class _EntryDetail extends ConsumerWidget {
     );
   }
 
-  String _describeDetection(DetectionRule rule) => switch (rule) {
-        RegistryDetection(:final keyPath) => 'Registry: $keyPath',
+  String _describeDetection(BuildContext context, DetectionRule rule) =>
+      switch (rule) {
+        RegistryDetection(:final keyPath) =>
+          S.of(context).registryDetection(keyPath),
         PathDetection(:final path) => path.stored,
         MsixDetection(:final packageFamilyName) =>
-          'MSIX package: $packageFamilyName',
+          S.of(context).msixDetection(packageFamilyName),
       };
 
   Future<void> _edit(
@@ -481,6 +487,8 @@ class _EntryDetail extends ConsumerWidget {
     final edited = await showEntryEditorDialog(context, entry);
     if (edited == null) return;
     ref.read(localEntriesProvider.notifier).save(edited);
+    // Detection rules may have changed — refresh scan results in background.
+    ref.read(scanProvider.notifier).scan();
   }
 
   Future<void> _exportYaml(BuildContext context, AppEntry entry) async {
@@ -494,10 +502,8 @@ class _EntryDetail extends ConsumerWidget {
     File(location.path).writeAsStringSync(buildYamlDraft(entry));
     await displayInfoBar(context, builder: (context, close) {
       return InfoBar(
-        title: const Text('YAML exported'),
-        content: Text(
-            'Saved to ${location.path}. Add it under apps/ in the '
-            'AppConfigShelf-DB repository and open a pull request.'),
+        title: Text(S.of(context).yamlExportedTitle),
+        content: Text(S.of(context).yamlExportedBody(location.path)),
         severity: InfoBarSeverity.success,
         onClose: close,
       );

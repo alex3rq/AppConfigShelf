@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_backup/shelf_backup.dart';
 import 'package:shelf_core/shelf_core.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import '../../shared/widgets/footer_action_bar.dart';
 import '../../shared/widgets/page_header.dart';
 import '../../shared/widgets/risk_chip.dart';
@@ -39,12 +40,14 @@ class _RestorePageState extends ConsumerState<RestorePage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ShelfPageHeader(
-            title: 'Restore',
-            subtitle:
-                'Nothing is touched until you press Restore — and everything '
-                'replaced can be rolled back.',
+            title: S.of(context).navRestore,
+            subtitle: S.of(context).restoreSubtitle,
             trailing: WizardSteps(
-              labels: const ['Open', 'Select', 'Done'],
+              labels: [
+                S.of(context).stepOpen,
+                S.of(context).stepSelect,
+                S.of(context).stepDone,
+              ],
               current: step,
             ),
           ),
@@ -58,7 +61,7 @@ class _RestorePageState extends ConsumerState<RestorePage> {
                     Button(
                         onPressed: () =>
                             ref.read(restoreProvider.notifier).reset(),
-                        child: const Text('Back')),
+                        child: Text(S.of(context).back)),
                   ]),
                 ),
               RestoreSelecting() => _Selection(
@@ -72,7 +75,9 @@ class _RestorePageState extends ConsumerState<RestorePage> {
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     const ProgressRing(),
                     const SizedBox(height: ShelfSpacing.md),
-                    Text('$currentEntry — $filesDone files restored'),
+                    Text(S
+                        .of(context)
+                        .restoreProgress(currentEntry, filesDone)),
                   ]),
                 ),
               RestoreComplete() => _Report(state: state),
@@ -88,7 +93,7 @@ class _RestorePageState extends ConsumerState<RestorePage> {
                     : () => ref
                         .read(restoreProvider.notifier)
                         .run(conflictMode: _conflictMode),
-                child: Text('Restore ${selected.length} entries'),
+                child: Text(S.of(context).restoreEntries(selected.length)),
               ),
             ),
         ],
@@ -117,10 +122,11 @@ class _Idle extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Open an .acshelf backup package to begin restoring.',
+          Text(S.of(context).restoreOpenPrompt,
               style: ShelfType.body.copyWith(color: p.textSecondary)),
           const SizedBox(height: ShelfSpacing.md),
-          FilledButton(onPressed: onOpen, child: const Text('Open backup…')),
+          FilledButton(
+              onPressed: onOpen, child: Text(S.of(context).openBackupAction)),
         ],
       ),
     );
@@ -144,11 +150,14 @@ class _SelectionSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${selected.length} of ${plan.candidates.length} entries selected'
-          '${conflicts > 0 ? ' · $conflicts existing files will be replaced' : ''}',
+          S.of(context).selectionSummary(
+                  selected.length, plan.candidates.length) +
+              (conflicts > 0
+                  ? S.of(context).selectionConflicts(conflicts)
+                  : ''),
           style: ShelfType.bodyStrong.copyWith(color: p.textPrimary),
         ),
-        Text('An undo bundle is saved before anything is replaced',
+        Text(S.of(context).undoNotice,
             style: ShelfType.caption.copyWith(color: p.accent)),
       ],
     );
@@ -197,10 +206,14 @@ class _Selection extends ConsumerWidget {
                             ShelfType.mono.copyWith(color: p.textPrimary)),
                     const SizedBox(height: ShelfSpacing.xs),
                     Text(
-                      'From ${manifest.machine.hostname} · created '
-                      '${manifest.createdAt.toLocal().toString().substring(0, 16)}'
-                      ' · app v${manifest.appVersion} · '
-                      '${state.plan.candidates.length} entries',
+                      S.of(context).packageInfo(
+                          manifest.machine.hostname,
+                          manifest.createdAt
+                              .toLocal()
+                              .toString()
+                              .substring(0, 16),
+                          manifest.appVersion,
+                          state.plan.candidates.length),
                       style: ShelfType.caption
                           .copyWith(color: p.textSecondary),
                     ),
@@ -209,13 +222,13 @@ class _Selection extends ConsumerWidget {
               ),
               HyperlinkButton(
                 onPressed: onChooseAnother,
-                child: const Text('Choose another file…'),
+                child: Text(S.of(context).chooseAnotherFile),
               ),
             ],
           ),
         ),
         const SizedBox(height: ShelfSpacing.lg),
-        Text('If a file already exists on this PC',
+        Text(S.of(context).conflictQuestion,
             style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
         const SizedBox(height: ShelfSpacing.sm),
         IntrinsicHeight(
@@ -225,10 +238,8 @@ class _Selection extends ConsumerWidget {
             Expanded(
               child: _ConflictCard(
                 selected: conflictMode == ConflictMode.overwrite,
-                title: 'Replace existing',
-                body:
-                    'Current files are copied into an undo bundle first — '
-                    'you can roll the whole restore back.',
+                title: S.of(context).replaceExisting,
+                body: S.of(context).replaceExistingBody,
                 onPressed: () =>
                     onConflictModeChanged(ConflictMode.overwrite),
               ),
@@ -237,10 +248,8 @@ class _Selection extends ConsumerWidget {
             Expanded(
               child: _ConflictCard(
                 selected: conflictMode == ConflictMode.skipExisting,
-                title: 'Keep existing',
-                body:
-                    'Only files missing on this PC are restored. Nothing is '
-                    'overwritten, no undo bundle needed.',
+                title: S.of(context).keepExisting,
+                body: S.of(context).keepExistingBody,
                 onPressed: () =>
                     onConflictModeChanged(ConflictMode.skipExisting),
               ),
@@ -252,14 +261,14 @@ class _Selection extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Text('Applications',
+                child: Text(S.of(context).applicationsSection,
                     style:
                         ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
               ),
               HyperlinkButton(
                 onPressed: () =>
                     ref.read(restoreProvider.notifier).selectAllRestorable(),
-                child: const Text('Select all restorable'),
+                child: Text(S.of(context).selectAllRestorable),
               ),
             ],
           ),
@@ -268,7 +277,7 @@ class _Selection extends ConsumerWidget {
           const SizedBox(height: ShelfSpacing.lg),
         ],
         if (customs.isNotEmpty) ...[
-          Text('Custom items',
+          Text(S.of(context).customItemsTitle,
               style: ShelfType.bodyStrong.copyWith(color: p.textPrimary)),
           const SizedBox(height: ShelfSpacing.sm),
           _CandidateCard(candidates: customs, state: state),
@@ -372,21 +381,21 @@ class _CandidateCard extends ConsumerWidget {
                                       ? p.textSecondary
                                       : p.textPrimary)),
                           const SizedBox(height: 2),
-                          Text('${c.entry.files.length} files',
+                          Text(S.of(context).nFiles(c.entry.files.length),
                               style: ShelfType.mono
                                   .copyWith(color: p.textSecondary)),
                         ],
                       ),
                     ),
                     if (gated)
-                      const ShelfChip(label: 'app not installed')
+                      ShelfChip(label: S.of(context).appNotInstalled)
                     else if (c.unknownEntry)
                       ShelfChip(
-                          label:
-                              'not in database — restores to recorded paths',
+                          label: S.of(context).notInDbRestores,
                           color: p.caution)
                     else if (c.conflictCount > 0)
-                      Text('${c.conflictCount} existing will be replaced',
+                      Text(
+                          S.of(context).existingReplaced(c.conflictCount),
                           style: ShelfType.caption
                               .copyWith(color: p.textSecondary)),
                   ],
@@ -429,14 +438,18 @@ class _Report extends ConsumerWidget {
         const SizedBox(height: ShelfSpacing.md),
         Center(
           child: Text(
-              clean ? 'Restore complete' : 'Restore finished with problems',
+              clean
+                  ? S.of(context).restoreComplete
+                  : S.of(context).restoreProblems,
               style: ShelfType.title.copyWith(color: p.textPrimary)),
         ),
         const SizedBox(height: ShelfSpacing.xs),
         Center(
           child: Text(
-              '${f.restoredFiles} files restored'
-              '${f.skippedFiles > 0 ? ' · ${f.skippedFiles} kept (newer on this PC)' : ''}',
+              S.of(context).restoredStats(f.restoredFiles) +
+                  (f.skippedFiles > 0
+                      ? S.of(context).keptNewer(f.skippedFiles)
+                      : ''),
               style: ShelfType.caption.copyWith(color: p.textSecondary)),
         ),
         if (f.undoPath case final undoPath?) ...[
@@ -449,7 +462,7 @@ class _Report extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Undo bundle saved — this restore can be rolled back',
+                      Text(S.of(context).undoSavedTitle,
                           style: ShelfType.bodyStrong
                               .copyWith(color: p.textPrimary)),
                       const SizedBox(height: ShelfSpacing.xs),
@@ -457,9 +470,7 @@ class _Report extends ConsumerWidget {
                           style:
                               ShelfType.mono.copyWith(color: p.textSecondary)),
                       const SizedBox(height: ShelfSpacing.xs),
-                      Text(
-                          'Open it like any backup to return this PC to '
-                          'exactly how it was before the restore.',
+                      Text(S.of(context).undoSavedBody,
                           style: ShelfType.caption
                               .copyWith(color: p.textSecondary)),
                     ],
@@ -476,13 +487,13 @@ class _Report extends ConsumerWidget {
                             .read(restoreProvider.notifier)
                             .openPackage(undoPath);
                       },
-                      child: const Text('Roll back now…'),
+                      child: Text(S.of(context).rollBackNow),
                     ),
                     const SizedBox(height: ShelfSpacing.xs),
                     HyperlinkButton(
                       onPressed: () =>
                           Process.run('explorer.exe', ['/select,', undoPath]),
-                      child: const Text('Show in folder'),
+                      child: Text(S.of(context).showInFolder),
                     ),
                   ],
                 ),
@@ -497,7 +508,7 @@ class _Report extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final failure in state.entryFailures) ...[
-                  Text('${failure.entryId} — halted',
+                  Text(S.of(context).entryHalted(failure.entryId),
                       style: ShelfType.bodyStrong.copyWith(color: p.caution)),
                   const SizedBox(height: 2),
                   Text(failure.reason,
@@ -517,12 +528,12 @@ class _Report extends ConsumerWidget {
                 ref.read(restoreProvider.notifier).reset();
                 ref.read(shellIndexProvider.notifier).state = ShellTab.home;
               },
-              child: const Text('Done'),
+              child: Text(S.of(context).done),
             ),
             const SizedBox(width: ShelfSpacing.sm),
             Button(
               onPressed: () => ref.read(restoreProvider.notifier).reset(),
-              child: const Text('Open another backup'),
+              child: Text(S.of(context).openAnotherBackup),
             ),
           ],
         ),

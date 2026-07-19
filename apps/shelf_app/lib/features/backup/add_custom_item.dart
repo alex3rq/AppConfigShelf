@@ -3,6 +3,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_core/shelf_core.dart';
 
+import '../../l10n/gen/app_localizations.dart';
 import 'backup_view_model.dart';
 
 /// Shared "add a folder as a custom backup item" flow: folder picker →
@@ -17,7 +18,7 @@ Future<bool> addCustomItemFlow(BuildContext context, WidgetRef ref) async {
   if (path == null) {
     await displayInfoBar(context, builder: (context, close) {
       return InfoBar(
-        title: const Text('Unsupported path'),
+        title: Text(S.of(context).unsupportedPath),
         content: Text(parsed.failureOrNull!.message),
         severity: InfoBarSeverity.error,
         onClose: close,
@@ -43,16 +44,16 @@ Future<String?> _promptName(BuildContext context, String initial) {
   return showDialog<String>(
     context: context,
     builder: (context) => ContentDialog(
-      title: const Text('Name this item'),
-      content: TextBox(controller: controller, autofocus: true),
+      title: Text(S.of(context).nameThisItem),
+      content: TextBox(controller: controller, autofocus: true, maxLines: 1),
       actions: [
         Button(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(S.of(context).cancel),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text.trim()),
-          child: const Text('Add'),
+          child: Text(S.of(context).add),
         ),
       ],
     ),

@@ -1,6 +1,8 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:shelf_core/shelf_core.dart';
 
+import '../../l10n/gen/app_localizations.dart';
+
 import '../../theme/shelf_theme.dart';
 
 /// Pill chip for an entry's [RiskTier]: Safe / Caution / Expert.
@@ -12,10 +14,11 @@ class RiskChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = ShelfTokens.of(context);
+    final s = S.of(context);
     final (label, color) = switch (risk) {
-      RiskTier.safe => ('Safe', p.success),
-      RiskTier.caution => ('Caution', p.caution),
-      RiskTier.expert => ('Expert', p.expert),
+      RiskTier.safe => (s.chipSafe, p.success),
+      RiskTier.caution => (s.chipCaution, p.caution),
+      RiskTier.expert => (s.chipExpert, p.expert),
     };
     return ShelfChip(label: label, color: color);
   }

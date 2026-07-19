@@ -11,6 +11,8 @@ import 'features/home/history_store.dart';
 import 'features/home/home_page.dart';
 import 'features/restore/restore_page.dart';
 import 'features/scan/scan_page.dart';
+import 'features/settings/settings_page.dart';
+import 'l10n/gen/app_localizations.dart';
 import 'shared/app_logging.dart';
 import 'shell_index.dart';
 import 'theme/shelf_theme.dart';
@@ -43,6 +45,9 @@ class ShelfApp extends ConsumerWidget {
       themeMode: ref.watch(themeModeProvider),
       theme: shelfLightTheme(),
       darkTheme: shelfDarkTheme(),
+      locale: ref.watch(localeProvider),
+      supportedLocales: S.supportedLocales,
+      localizationsDelegates: S.localizationsDelegates,
       home: const HomeShell(),
     );
   }
@@ -54,6 +59,7 @@ class HomeShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(shellIndexProvider);
+    final s = S.of(context);
     return NavigationView(
       pane: NavigationPane(
         selected: index,
@@ -64,27 +70,27 @@ class HomeShell extends ConsumerWidget {
         items: [
           PaneItem(
             icon: const Icon(FluentIcons.home),
-            title: const Text('Home'),
+            title: Text(s.navHome),
             body: const HomePage(),
           ),
           PaneItem(
             icon: const Icon(FluentIcons.grid_view_medium),
-            title: const Text('Applications'),
+            title: Text(s.navApplications),
             body: const ScanPage(),
           ),
           PaneItem(
             icon: const Icon(FluentIcons.save),
-            title: const Text('Backup'),
+            title: Text(s.navBackup),
             body: const BackupPage(),
           ),
           PaneItem(
             icon: const Icon(FluentIcons.history),
-            title: const Text('Restore'),
+            title: Text(s.navRestore),
             body: const RestorePage(),
           ),
           PaneItem(
             icon: const Icon(FluentIcons.library),
-            title: const Text('Library'),
+            title: Text(s.navLibrary),
             body: const DatabasePage(),
           ),
         ],
@@ -95,49 +101,14 @@ class HomeShell extends ConsumerWidget {
             onTap: () => ref.read(shellIndexProvider.notifier).state =
                 ShellTab.library,
           ),
-          PaneItemAction(
-            icon: const Icon(FluentIcons.color),
-            title: const Text('Theme'),
-            onTap: () => _showThemePicker(context, ref),
+          PaneItem(
+            icon: const Icon(FluentIcons.settings),
+            title: Text(s.navSettings),
+            body: const SettingsPage(),
           ),
         ],
       ),
     );
-  }
-
-  Future<void> _showThemePicker(BuildContext context, WidgetRef ref) async {
-    final current = ref.read(themeModeProvider);
-    final picked = await showDialog<ThemeMode>(
-      context: context,
-      builder: (context) => ContentDialog(
-        title: const Text('Theme'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final (mode, label) in [
-              (ThemeMode.system, 'Follow Windows setting (default)'),
-              (ThemeMode.dark, 'Dark'),
-              (ThemeMode.light, 'Light'),
-            ])
-              ListTile.selectable(
-                selected: current == mode,
-                title: Text(label),
-                onPressed: () => Navigator.pop(context, mode),
-              ),
-          ],
-        ),
-        actions: [
-          Button(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-    if (picked != null) {
-      ref.read(themeModeProvider.notifier).set(picked);
-    }
   }
 }
 
@@ -168,7 +139,7 @@ class _PaneHeader extends StatelessWidget {
               Text('AppConfigShelf',
                   style: ShelfType.bodyStrong
                       .copyWith(color: p.textPrimary, height: 1.1)),
-              Text('Back up your apps',
+              Text(S.of(context).appTagline,
                   style: ShelfType.caption
                       .copyWith(color: p.textSecondary, height: 1.1)),
             ],
@@ -186,6 +157,7 @@ class _PaneStatusFooter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = S.of(context);
     final p = ShelfTokens.of(context);
     final bundle = ref.watch(dbBundleProvider).valueOrNull;
     final lastBackup = ref
@@ -195,9 +167,9 @@ class _PaneStatusFooter extends ConsumerWidget {
 
     String relative(DateTime t) {
       final days = DateTime.now().difference(t).inDays;
-      if (days < 1) return 'today';
-      if (days == 1) return 'yesterday';
-      return '${days}d ago';
+      if (days < 1) return s.relativeToday;
+      if (days == 1) return s.relativeYesterday;
+      return s.relativeDaysAgoShort(days);
     }
 
     return Column(
@@ -206,16 +178,16 @@ class _PaneStatusFooter extends ConsumerWidget {
       children: [
         Text(
           bundle == null
-              ? 'Database loading…'
-              : 'Db v${bundle.contentVersion} · ${bundle.entries.length} entries',
+              ? s.statusDbLoading
+              : s.statusDb(bundle.contentVersion, bundle.entries.length),
           style: ShelfType.caption
               .copyWith(color: p.textSecondary, height: 1.1),
           overflow: TextOverflow.ellipsis,
         ),
         Text(
           lastBackup == null
-              ? 'No backups yet'
-              : 'Last backup ${relative(lastBackup.timestamp)}',
+              ? s.statusNoBackups
+              : s.statusLastBackup(relative(lastBackup.timestamp)),
           style: ShelfType.caption
               .copyWith(color: p.textSecondary, height: 1.1),
           overflow: TextOverflow.ellipsis,
